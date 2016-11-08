@@ -212,14 +212,14 @@ void getNextSym(){
         sym=intcon;
         num_read=0;
         //开始读数字
-        //???????????????????????零开头数字报错？？？？
         do{
+            if(read_ch_len==1&&token[0]=='0'){
+                printf("num begin with zero\n");
+                read_ch_len--;
+            }
             token[read_ch_len++]=ch;
             getNextCh();
         }while(is_digital(ch));
-        if(token[0]=='0'&&read_ch_len>1){
-            printf("num begin with zero\n");
-        }
         if(is_letter(ch)){
             printf("error number\n");
         }else{
