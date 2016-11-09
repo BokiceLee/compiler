@@ -11,12 +11,7 @@
 #define MAX_NUM 99999999
 #define REVERSED_NUM 16
 #define SPECIAL_SYM_NUM 20
-FILE *fsource;//源代码文件指针
-FILE *ftarget;//目标代码输出文件指针
-char fsourcename[MAX_LEN_OF_FILE];//源代码文件名称
-char ftargetname[MAX_LEN_OF_FILE];//目标代码文件名称
-//存储用的数据结构
-char stringtable[LEN_OF_STRING_TABLE][LEN_OF_STRING];
+#define ERROR_NUM 9
 enum symbol{
     beginsy=0,casesy,charsy,constsy,defaultsy,elsesy,endsy,
     ifsy,intsy,mainsy,printfsy,returnsy,scanfsy,
@@ -25,7 +20,7 @@ enum symbol{
     plus,minus,times,idiv,
     lparent,rparent,lbrack,rbrack,lfbrace,rfbrace,
     comma,semicolon,colon,becomes,//colon:冒号,semicolon:分号
-    ident,intcon,charcon,stringcon
+    ident,intcon,charcon,stringcon,illegalcon
 };
 char* special_symbol[SPECIAL_SYM_NUM]={
     "eql",//0
@@ -67,10 +62,27 @@ char* reversed_table[REVERSED_NUM]={
     "void",//14
     "while"//15
 };
-//int cc;//char counter
-//int ll;// line length
+char* errormsg[ERROR_NUM]={
+    "num begin with zero",
+    "number should not end with letter or identity should not begin with number,maybe missing a space?",
+    "error too big num",
+    "wrong char",
+    "error of char",
+    "wrong char in string",
+    "error '!'",
+    "illegal character",
+    "incomplete"
+};
+int errors=0;
+FILE *fsource;//源代码文件指针
+FILE *ftarget;//目标代码输出文件指针
+char fsourcename[MAX_LEN_OF_FILE];//源代码文件名称
+char ftargetname[MAX_LEN_OF_FILE];//目标代码文件名称
+//存储用的数据结构
+char stringtable[LEN_OF_STRING_TABLE][LEN_OF_STRING];
 char ch;//读到的字符
-//char line[MAX_LEN_OF_LINE];//读取一行字符
+int row_in_source_file=1;
+int column_in_source_file=0;
 enum symbol sym;
 char token[MAX_LEN_OF_TOKEN];
 int num_read=0;
@@ -78,6 +90,34 @@ int read_ch_len=0;
 int string_table_index=0;
 int string_index=0;
 int i_temp;
+int output2where_console_0_file_1=0;
+int optimization=0;
+void error(int error_code){
+    switch(error_code){
+    case 0:
+        token[--read_ch_len]='\0';
+        break;
+    case 1:
+        break;
+    case 2:
+        num_read=0;
+        break;
+    case 3:
+        break;
+    case 4:
+        break;
+    case 5:
+        break;
+    case 6:
+        break;
+    case 7:
+        break;
+    case 8:
+        break;
+    }
+    printf("error at row %d,column %d:\n",row_in_source_file,column_in_source_file);
+    printf("error:%d ~~~~~error message:%s\n",++errors,errormsg[error_code]);
+}
 void clearToken(){
     while(read_ch_len>=0){
         token[read_ch_len--]='\0';
@@ -160,33 +200,50 @@ int is_digital(char c){
     return 0;
 }
 void setInputOutput(){
+    set_in:
     printf("please input the absolute path of your source file(space is not available):\n");
     scanf("%s",fsourcename);
     fsource=fopen(fsourcename,"r");
     if(NULL==fsource){
         printf("no such file\n");
-        return;
+        goto set_in;
     }
-    printf("please input the absolute path of target file you expect:\n");
-    scanf("%s",ftargetname);
-    ftarget=fopen(ftargetname,"w");
-    if(NULL==ftarget){
-        printf("please input the correct absolute path of target file\n");
-        return;
+    set_out:
+    printf("input 0/1,0 for output result to console,1 for output result to file and you will have to input a file path\n");
+    scanf("%d",&output2where_console_0_file_1);
+    if(output2where_console_0_file_1){
+        printf("please input the absolute path of target file you expect:\n");
+        scanf("%s",ftargetname);
+        ftarget=fopen(ftargetname,"w");
+        if(NULL==ftarget){
+            printf("please input the correct absolute path of target file\n");
+            goto set_out;
+        }
+    }else{
+        ftarget=stdout;
     }
 }
-void outPut2File(char s[]){
-    fprintf(ftarget,"%s",s);
-}
-void out2Screen(char s[]){
-    printf("%s",s);
+void finish_compile(){
+    fclose(fsource);
+    if(output2where_console_0_file_1){
+        fclose(ftarget);
+    }
 }
 void getNextCh(){
     if((ch=fgetc(fsource))==EOF){
-        printf("incomplete");
+        column_in_source_file++;
+        error(8);
         exit(0);
     }
     ch=tolower(ch);
+    if(ch=='\n'){
+        column_in_source_file=0;
+        row_in_source_file++;
+    }else if(ch=='\t'){
+        column_in_source_file+=4;
+    }else{
+        column_in_source_file++;
+    }
     //system("pause");
 }
 void getNextSym(){
@@ -214,22 +271,18 @@ void getNextSym(){
         //开始读数字
         do{
             if(read_ch_len==1&&token[0]=='0'){
-                printf("num begin with zero\n");
-                read_ch_len--;
+                error(0);
             }
             token[read_ch_len++]=ch;
             getNextCh();
         }while(is_digital(ch));
         if(is_letter(ch)){
-            printf("error number\n");
-        }else{
-            token[read_ch_len]='\0';
-            num_read=atoi(token);
+            error(1);
         }
+        token[read_ch_len]='\0';
+        num_read=atoi(token);
         if(read_ch_len>MAX_LEN_OF_NUM || num_read>MAX_NUM){
-            printf("error too big num\n");
-            read_ch_len=0;
-            num_read=0;
+            error(2);
         }
     }else{
         switch(ch){
@@ -289,12 +342,15 @@ void getNextSym(){
             sym=charcon;
             getNextCh();
             if(!(is_add_op_char(ch)||is_mul_op_char(ch)||is_digital(ch)||is_letter(ch))){
-                printf("wrong char\n");
+                error(3);
             }
             token[0]=ch;
-            getNextCh();
-            if(ch!='\''){
-                printf("error of char\n");
+            do{
+                getNextCh();
+                read_ch_len++;
+            }while(ch!='\'');
+            if(read_ch_len>1){
+                error(4);
             }
             getNextCh();
             break;
@@ -306,7 +362,7 @@ void getNextSym(){
                     if(is_right_char_in_string(ch)){
                         stringtable[string_table_index][string_index++]=ch;
                     }else{
-                        printf("wrong char in string\n");
+                        error(5);
                     }
                 }else{
                     string_table_index++;
@@ -321,7 +377,7 @@ void getNextSym(){
                 sym=neq;
                 getNextCh();
             }else{
-                printf("error '!'");
+                error(6);
             }
             break;
         case '=':
@@ -351,7 +407,9 @@ void getNextSym(){
             }
             break;
         default:
-            printf("illegal character\n");
+            error(7);
+            sym=illegalcon;
+            token[read_ch_len++]=ch;
             getNextCh();
         }
     }
@@ -360,40 +418,41 @@ int main()
 {
     setInputOutput();
     ch=' ';
-    printf("lexical analysis result:");
+    fprintf(ftarget,"lexical analysis result:");
     while(1){
     //for (i=0;i<500;i++){
-        printf("\n");
+        fprintf(ftarget,"\n");
         getNextSym();
         if(0<=sym && sym<=15){
-            printf(reversed_table[sym]);
-            printf(" ");
+            fprintf(ftarget,reversed_table[sym]);
+            fprintf(ftarget," ");
         }else if(16<=sym&&sym<=35){
-            printf(special_symbol[sym-16]);
-            printf(" ");
+            fprintf(ftarget,special_symbol[sym-16]);
+            fprintf(ftarget," ");
         }else{
             switch(sym){
             case ident:
-                printf("ident:");
-                printf("%s ",token);
+                fprintf(ftarget,"ident:");
+                fprintf(ftarget,"%s ",token);
                 break;
             case intcon:
-                printf("num:");
-                printf("%d ",num_read);
+                fprintf(ftarget,"num:");
+                fprintf(ftarget,"%d ",num_read);
                 break;
             case charcon:
-                printf("char:");
-                printf("%c ",token[0]);
+                fprintf(ftarget,"char:");
+                fprintf(ftarget,"%c",token[0]);
                 break;
             case stringcon:
-                printf("string:");
-                printf("%s ",stringtable[string_table_index-1]);
+                fprintf(ftarget,"string:");
+                fprintf(ftarget,"%s",stringtable[string_table_index-1]);
                 break;
             default:
-                ;
+                fprintf(ftarget,"illegal:");
+                fprintf(ftarget,"%c",token[0]);
             }
         }
     }
-    fclose(fsource);
+    finish_compile();
     return 0;
 }
