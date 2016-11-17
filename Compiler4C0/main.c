@@ -443,6 +443,7 @@ int check_redeclaraction(int is_global,char* ident_name){
     return 0;
 }
 void program(){
+    printf("程序\n");
     if(sym==constsy){
         constdeclaraction(1);
     }
@@ -476,6 +477,7 @@ void program(){
 void constdeclaraction(int is_global){
     do{
         if(sym==constsy){
+            printf("常量说明\n");
             getNextSym();
         }
         if(sym==intsy||sym==charsy){
@@ -497,6 +499,7 @@ void constdefinition(int is_global){
         ident_typ=chars;
     }
     do{
+        printf("常量定义\n");
         getNextSym();
         if(sym==ident){
             redcl_flag=check_redeclaraction(is_global,token);
@@ -532,6 +535,7 @@ void constdefinition(int is_global){
 void vardeclaraction(int is_global){
     enum typs ident_typs;
     while(sym==intsy || sym==charsy){
+        printf("变量/函数说明\n");
         if(sym==intsy){
             ident_typs=ints;
         }else{
@@ -571,14 +575,19 @@ void vardefinition(int is_global){
                     strcpy(ident_name_var_funct,tmp_token);
                     break;
                 }
+                printf("变量定义\n");
                 if(sym!=lbrack){
                     enter_ident(tmp_token,is_global,var,ident_typs,0,0);
                 }else{
                     getNextSym();
-                    selector();
-                    enter_array();
-                    enter_ident(tmp_token,is_global,arrays,ident_typs,0,0);
-                    getNextSym();
+                    if(sym!=intcon){
+                        error(20);
+                    }else{
+                        enter_array();
+                        enter_ident(tmp_token,is_global,arrays,ident_typs,0,0);
+                        getNextSym();
+                        getNextSym();
+                    }
                 }
             }
         }
@@ -592,6 +601,7 @@ void funct_void_declaraction(int is_global){
     if(sym==mainsy){
         return;
     }
+    printf("无返回值函数定义\n");
     if(sym==ident){
         //检查重命名
         getNextSym();
@@ -652,6 +662,7 @@ void funct_ret_declaraction(int is_global,enum typs ret_typ){
     if(sym!=lparent){
         error(22);
     }else{
+        printf("有返回值函数定义\n");
         parameterlist();
         if(sym!=rparent){
             error(17);
@@ -677,6 +688,7 @@ void funct_main_declaraction(int is_global){
     int refer;
     int adr;
     if(sym==mainsy){
+        printf("主函数定义\n");
         getNextSym();
         if(sym!=lparent){
             error(21);
@@ -708,6 +720,7 @@ void parameterlist(){
     enum typs ident_typ;
     int redcl_flag=0;
     char tmp_token[LEN_OF_NAME];
+    printf("参数表\n");
     do{
         getNextSym();
         if(sym!=intsy&&sym!=charsy&&sym!=rparent){
@@ -751,6 +764,7 @@ void parameterlist(){
     }while(sym==comma);
 }
 void compound_statement(){
+    printf("复合语句\n");
     if(sym==constsy){
         constdeclaraction(0);
     }
@@ -761,6 +775,7 @@ void compound_statement(){
 }
 void statement(){
     char tmp_token[LEN_OF_NAME];
+    printf("语句\n");
     switch(sym){
         case ifsy:
             getNextSym();
@@ -790,6 +805,7 @@ void statement(){
             if(sym==becomes){
                 assignment(tmp_token);
             }else if(sym==lparent){
+                getNextSym();
                 funct_call(tmp_token);
             }else{
                 error(32);
@@ -824,11 +840,13 @@ void statement(){
 }
 void statements(){
     char tmp_token[LEN_OF_NAME];
+    printf("语句列\n");
     do{
         statement();
     }while(sym!=rquote);
 }
 void if_statement(){
+    printf("if 语句\n");
     if(sym!=lparent){
         error(25);
     }else{
@@ -842,8 +860,14 @@ void if_statement(){
         getNextSym();
         statement();
     }
+    if(sym==elsesy){
+        printf("if 中 else\n");
+        getNextSym();
+        statement();
+    }
 }
 void while_statement(){
+    printf("while 语句\n");
     if(sym!=lparent){
         error(25);
     }else{
@@ -859,6 +883,7 @@ void while_statement(){
 }
 void condition(){
     enum symbol tmp_sym;
+    printf("if或while判断条件 \n");
     simpleexpression();
     if(sym==eql||sym==neq||sym==gtr||sym==geq||sym==lss||sym==leq){
         tmp_sym=sym;
@@ -878,6 +903,7 @@ void condition(){
 void assignment(char tmp_token[]){
     enum typs ret_typ;
     int res_position=position(tmp_token);
+    printf("赋值语句\n");
     //tmp_token可能是数组
     if(sym==lbrack){
         getNextSym();
@@ -904,6 +930,7 @@ void assignment(char tmp_token[]){
 }
 void switch_statement(){
     enum typs condition_typ;
+    printf("情况语句\n");
     if(sym!=lparent){
         error(25);
     }else{
@@ -928,6 +955,7 @@ void switch_statement(){
     }
 }
 void caselabel(){
+    printf("情况表\n");
     while(sym==casesy){
         //常量
         getNextSym();
@@ -946,6 +974,7 @@ void caselabel(){
     }
 }
 void onecase(){
+    printf("情况子语句\n");
     if(sym!=colon){
         error(40);
     }else{
@@ -954,6 +983,7 @@ void onecase(){
     }
 }
 void defaultcase(){
+    printf("缺省\n");
     if(sym!=colon){
         error(42);
     }else{
@@ -963,6 +993,7 @@ void defaultcase(){
 }
 void scanf_statement(){
     int res_position;
+    printf("读语句\n");
     if(sym!=lparent){
         error(29);
     }else{
@@ -989,6 +1020,7 @@ void scanf_statement(){
 }
 void printf_statement(){
     int res_position;
+    printf("写语句\n");
     if(sym!=lparent){
         error(29);
     }else{
@@ -1019,6 +1051,7 @@ int factor(){
     int res_position;
     char tmp_token[LEN_OF_NAME];
     //test
+    printf("因子\n");
     if(sym==ident||sym==intcon||sym==charcon){
         if(sym==ident){
             strcpy(tmp_token,token);
@@ -1081,6 +1114,7 @@ int factor(){
 }
 int term(){
     enum symbol fac_op;
+    printf("项\n");
     factor();
     while(times==sym||sym==idiv){
         fac_op=sym;
@@ -1097,6 +1131,7 @@ int term(){
 }
 int simpleexpression(){
     enum symbol positive;
+    printf("表达式\n");
     if(sym==pluss||sym==minuss){
         positive=sym;
         getNextSym();
@@ -1144,6 +1179,10 @@ int expression(){
     return notyp;
 }
 void return_statement(){
+    printf("返回语句\n");
+    if(sym==semicolon){
+        return;
+    }
     if(sym!=lparent){
         error(29);
     }else{
@@ -1156,6 +1195,7 @@ void return_statement(){
     getNextSym();
 }
 void funct_call(char funct_name[]){
+    printf("函数调用语句\n");
     if(sym!=rparent){
         value_parameterlist();
     }else{
@@ -1168,6 +1208,7 @@ void funct_call(char funct_name[]){
     }
 }
 void value_parameterlist(){
+    printf("值参数表\n");
     simpleexpression();
     if(sym==comma){
         do{
@@ -1177,6 +1218,7 @@ void value_parameterlist(){
     }
 }
 void selector(){
+    printf("数组选择器\n");
     simpleexpression();
     if(sym!=rbrack){
         error(18);
