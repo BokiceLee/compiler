@@ -1,21 +1,13 @@
-#ifndef MYHEAD_H_INCLUDED
-#define MYHEAD_H_INCLUDED
-#define MAX_LEN_OF_FILE 1024
-#define MAX_LEN_OF_LINE 1024
-#define MAX_LEN_OF_TOKEN 10
-#define LEN_OF_STRING_TABLE 200
-#define LEN_OF_STRING 200
-#define MAX_LEN_OF_NUM 8
-#define MAX_NUM 99999999
+#ifndef LEXICALANALYSIS_H_INCLUDED
+#define LEXICALANALYSIS_H_INCLUDED
 #define REVERSED_NUM 16
 #define SPECIAL_SYM_NUM 20
-#define ERROR_NUM 10
 enum symbol{
     beginsy=0,casesy,charsy,constsy,defaultsy,elsesy,endsy,
     ifsy,intsy,mainsy,printfsy,returnsy,scanfsy,
     switchsy,voidsy,whilesy,
     eql,neq,gtr,geq,lss,leq,
-    plus,minus,times,idiv,
+    pluss,minuss,times,idiv,
     lparent,rparent,lbrack,rbrack,lquote,rquote,
     comma,semicolon,colon,becomes,//colon:Ã°ºÅ,semicolon:·ÖºÅ
     ident,intcon,charcon,stringcon,illegalcon
@@ -60,19 +52,7 @@ char* reversed_table[REVERSED_NUM]={
     "void",//14
     "while"//15
 };
-char* errormsg[ERROR_NUM]={
-    "num begin with zero",
-    "number should not end with letter or identity should not begin with number,maybe missing a space?",
-    "error too big num",//2
-    "wrong char",//3
-    "error of char",//4
-    "wrong char in string",//5
-    "error '!'",//6
-    "illegal character",//7
-    "incomplete",//8
-    "no char in define char"//9
-};
-void error(int error_code);
+void clearTmpToken(char tmp_token[]);
 void clearToken();
 int is_reversed(char* s);
 int is_empty_char(char c);
@@ -82,8 +62,6 @@ int is_letter(char c);
 int is_not_zero_digital(char c);
 int is_right_char_in_string(char c);
 int is_digital(char c);
-void setInputOutput();
-void finish_compile();
 void getNextCh();
 void getNextSym();
-#endif // MYHEAD_H_INCLUDED
+#endif // LEXICALANALYSIS_H_INCLUDED
