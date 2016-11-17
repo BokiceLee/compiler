@@ -93,6 +93,7 @@ void error(int error_code){
     case 8:
         break;
     }
+    return;
     printf("error at row %d,column %d:\n",row_in_source_file,column_in_source_file);
     printf("error:%d ~~~~~error message:%s\n",++errors,errormsg[error_code]);
 }
@@ -460,6 +461,17 @@ void program(){
         }
     }
     funct_main_declaraction(1);
+    while(ch!=-1){
+        getNextCh();
+        if(!is_empty_char(ch)){
+            break;
+        }
+    }
+    if(ch==-1){
+        printf("程序正确结束\n");
+    }else{
+        printf("程序未正确结束");
+    }
 }
 void constdeclaraction(int is_global){
     do{
@@ -682,7 +694,6 @@ void funct_main_declaraction(int is_global){
                     if(sym!=rquote){
                         error(19);
                     }else{
-                        getNextSym();
                         enter_funct();
                         //enter_ident(token,is_global,func,notyp,refer,adr);
                     }
@@ -1220,7 +1231,7 @@ int main()
 {
     setInputOutput();
     ch=' ';
-    fprintf(ftarget,"lexical analysis result:");
+    fprintf(ftarget,"grammar analysis result:");
     getNextSym();
     program();
     while(1){
