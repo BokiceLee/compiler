@@ -795,12 +795,7 @@ void statement(){
             getNextSym();
             if(sym==lbrack){
                 getNextSym();
-                simpleexpression();
-                if(sym!=rbrack){
-                    error(18);
-                }else{
-                    getNextSym();
-                }
+                selector();
             }
             if(sym==becomes){
                 assignment(tmp_token);
