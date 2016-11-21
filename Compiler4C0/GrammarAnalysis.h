@@ -31,4 +31,5 @@ void printf_statement();
 void return_statement();
 void funct_call(char funct_name[]);
 void value_parameterlist();
+void declaration_head();
 #endif // GRAMMARANALYSIS_H_INCLUDED

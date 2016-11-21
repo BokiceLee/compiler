@@ -15,7 +15,6 @@ int optimization=0;
 int return_temp=0;
 int end_flag=0;
 ////词法分析////
-int errors=0;
 int row_in_source_file=1;
 int column_in_source_file=0;
 ////输入输出////
@@ -29,14 +28,6 @@ enum symbol sym;
 char token[LEN_OF_NAME];
 int num_read=0;
 int read_ch_len=0;
-////符号管理////
-int string_table_index=0;
-int string_index=0;
-struct ident_tab_item ident_tab[IDENT_TAB_LEN];
-int ident_index=0;
-int i_temp;
-enum typs typ_var_funct;
-char ident_name_var_funct[LEN_OF_NAME];
 ////lobal////
 void setInputOutput(){
     set_in:
@@ -68,7 +59,80 @@ void finish_compile(){
         fclose(ftarget);
     }
 }
+////符号管理////
+int i_temp;
+enum types typ_var_funct;
+char ident_name_var_funct[LEN_OF_NAME];
 
+int ident_index=0;
+
+char string_tab[LEN_OF_STRING_TAB][LEN_OF_STRING];
+int string_table_index=0;
+int string_index=0;
+
+struct global_ident_tab_item global_ident_tab[IDENT_TAB_LEN];
+struct local_ident_tab_item local_ident_tab[IDENT_TAB_LEN];
+int global_ident_index=0;
+int local_ident_index=0;
+int last_local_ident_index=-1;
+struct funct_tab_item funct_tab[LEN_OF_FUNC_TAB];
+int funct_tab_index=0;
+int funct_index=-1;//记录当前函数在函数表中的索引
+int array_tab[LEN_OF_ARRAY_TAB];
+int array_tab_index=0;
+int position_res_global_flag;
+////符号表管理////
+int position(char tmp_token[]){
+    int i;
+    for(i=local_ident_index-1;i>=0;i--){
+        if(strcmp(tmp_token,local_ident_tab[i].name)==0){
+            position_res_global_flag=0;
+            return i;
+        }
+    }
+    for(i=global_ident_index-1;i>=0;i--){
+        if(strcmp(tmp_token,global_ident_tab[i].name)==0){
+            position_res_global_flag=1;
+            return i;
+        }
+    }
+    return i;
+}
+void enter_ident(int is_global,char name[],int obj,int typ,int refer,int adr){
+    if(ident_index>=IDENT_TAB_LEN){
+        fatal();
+    }else{
+        if(is_global){
+            strcpy(global_ident_tab[global_ident_index].name,name);
+            global_ident_tab[global_ident_index].obj=obj;
+            global_ident_tab[global_ident_index].typ=typ;
+            global_ident_tab[global_ident_index].refer=refer;
+            global_ident_tab[global_ident_index].adr=adr;
+            global_ident_index++;
+        }else{
+            strcpy(local_ident_tab[local_ident_index].name,name);
+            local_ident_tab[local_ident_index].obj=obj;
+            local_ident_tab[local_ident_index].typ=typ;
+            local_ident_tab[local_ident_index].refer=refer;
+            local_ident_tab[local_ident_index].adr=adr;
+            local_ident_tab[local_ident_index].link=last_local_ident_index;
+            last_local_ident_index=local_ident_index;
+            local_ident_index++;
+        }
+    }
+}
+void enter_array(int high){
+    array_tab[array_tab_index++]=high;
+}
+int enter_funct(int last,int lastpar,int psize,int vsize){
+    funct_tab[funct_tab_index].last=last;
+    funct_tab[funct_tab_index].lastpar=lastpar;
+    funct_tab[funct_tab_index].psize=psize;
+    funct_tab[funct_tab_index].vsize=vsize;
+    return funct_tab_index++;
+}
+////出错处理////
+int errors=0;
 ////出错处理////
 void error(int error_code){
     switch(error_code){
@@ -150,6 +214,9 @@ void testsemicolon(){
 //    }
 //    test(tmp_legal_set,tmp_legal_set_len,fsys,fsys_len,err_code);
 }
+void fatal(){
+    ;
+}
 ////词法分析////
 void clearTmpToken(char tmp_Token[]){
     int i;
@@ -163,11 +230,12 @@ void clearToken(){
     }
     read_ch_len=0;
 }
-int is_reversed(char* s){
+int is_reversed(char s[]){
     int left=0;
     int right=REVERSED_NUM-1;
     int mid;
     int compare_res;
+    strlwr(s);
     do{
         mid=(left+right)/2;
         compare_res=strcmp(s,reversed_table[mid]);
@@ -438,10 +506,6 @@ void getNextSym(){
     }
 }
 ////语法分析////
-int check_redeclaraction(int is_global,char* ident_name){
-
-    return 0;
-}
 void program(){
     if(sym==constsy){
         constdeclaraction(1);
@@ -489,10 +553,11 @@ void constdeclaraction(int is_global){
     }while(sym==constsy);
 }
 void constdefinition(int is_global){
-    enum typs ident_typ;
+    enum types ident_typ;
     int redcl_flag=0;
     char tmp_token[LEN_OF_NAME];
     int value=0;
+    int positive;
     if(sym==intsy){
         ident_typ=ints;
     }else{
@@ -508,16 +573,31 @@ void constdefinition(int is_global){
                 strcpy(tmp_token,token);
                 getNextSym();
                 if(sym==becomes){
+                    positive=1;
                     getNextSym();
+                    if(sym==pluss||sym==minuss){
+                        if(sym==minuss){
+                            positive=-1;
+                        }
+                        getNextSym();
+                        if(sym!=intcon){
+                            error(39);
+                        }else if(num_read==0){
+                            error(16);
+                        }
+                    }
+                    if(sym!=intcon&&sym!=charcon){
+                        error(23);
+                    }
                     if(sym==intcon && ident_typ==ints){
-                        enter_ident(tmp_token,is_global,con,ints,0,num_read);
+                        enter_ident(is_global,tmp_token,con,ints,0,num_read);
                     }else if(sym==charcon && ident_typ==chars){
                         value=token[0];
-                        enter_ident(tmp_token,is_global,con,chars,0,value);
+                        enter_ident(is_global,tmp_token,con,chars,0,value);
                     }else if(sym==chars && ident_typ==ints){
                         error(26);
                         value=token[0];
-                        enter_ident(tmp_token,is_global,con,ints,0,value);
+                        enter_ident(is_global,tmp_token,con,ints,0,value);
                     }else {
                         error(11);
                     }
@@ -533,7 +613,7 @@ void constdefinition(int is_global){
     }while(sym==comma);
 }
 void vardeclaraction(int is_global){
-    enum typs ident_typs;
+    enum types ident_typs;
     while(sym==intsy || sym==charsy){
         if(sym==intsy){
             ident_typs=ints;
@@ -552,7 +632,7 @@ void vardeclaraction(int is_global){
     }
 }
 void vardefinition(int is_global){
-    enum typs ident_typs;
+    enum types ident_typs;
     int redcl_flag=0;
     char tmp_token[LEN_OF_NAME];
     if(sym==intsy){
@@ -566,7 +646,6 @@ void vardefinition(int is_global){
             redcl_flag=check_redeclaraction(is_global,token);
             if(redcl_flag){
                 error(36);
-                getNextSym();
             }else{
                 strcpy(tmp_token,token);
                 getNextSym();
@@ -576,16 +655,23 @@ void vardefinition(int is_global){
                     break;
                 }
                 if(sym!=lbrack){
-                    enter_ident(tmp_token,is_global,var,ident_typs,0,0);
+                    enter_ident(is_global,tmp_token,var,ident_typs,0,0);
                 }else{
                     getNextSym();
                     if(sym!=intcon){
                         error(20);
                     }else{
-                        enter_array();
-                        enter_ident(tmp_token,is_global,arrays,ident_typs,0,0);
+                        if(num_read==0){
+                            error(20);
+                        }
+                        enter_ident(is_global,tmp_token,arrays,ident_typs,array_tab_index,0);
+                        enter_array(num_read);
                         getNextSym();
-                        getNextSym();
+                        if(sym!=rbrack){
+                            error(18);
+                        }else{
+                            getNextSym();
+                        }
                     }
                 }
             }
@@ -593,21 +679,30 @@ void vardefinition(int is_global){
                 printf("变量定义\n");
     }while(sym==comma);
 }
-void funct_void_declaraction(int is_global){
+void funct_void_declaraction(){
     int refer=0;
     int adr=0;
     int redcl_flag=0;
+    int lastpar;
     char tmp_token[LEN_OF_NAME];
     if(sym==mainsy){
         return;
     }
     if(sym==ident){
+        redcl_flag=check_redeclaraction(1,token);
+        if(redcl_flag){
+            error(36);
+        }else{
+            strcpy(tmp_token,token);
+        }
         //检查重命名
         getNextSym();
         if(sym!=lparent){
             error(22);
         }else{
+            last_local_ident_index=-1;
             parameterlist();
+            lastpar=local_ident_index;
             if(sym!=rparent){
                 error(17);
             }else{
@@ -620,8 +715,8 @@ void funct_void_declaraction(int is_global){
                     if(sym!=rquote){
                         error(19);
                     }else{
-                        enter_funct();
-                        enter_ident(token,is_global,func,notyp,refer,adr);
+                        refer=enter_funct(last_local_ident_index,lastpar,0,0);
+                        enter_ident(1,tmp_token,func,notyp,refer,adr);
                         getNextSym();
                     }
                 }
@@ -632,11 +727,12 @@ void funct_void_declaraction(int is_global){
         error(13);
     }
 }
-void funct_ret_declaraction(int is_global,enum typs ret_typ){
-    enum typs typ;
+void funct_ret_declaraction(int is_global,int ret_typ){
+    enum types typ;
     int refer;
-    int adr;
+    int adr=0;
     int redcl_flag=0;
+    int lastpar;
     char tmp_token[LEN_OF_NAME];
     if(sym==intsy){
         typ=ints;
@@ -646,7 +742,12 @@ void funct_ret_declaraction(int is_global,enum typs ret_typ){
         getNextSym();
     }
     if(sym==ident){
-        strcpy(tmp_token,token);
+        redcl_flag=check_redeclaraction(1,token);
+        if(redcl_flag){
+            error(36);
+        }else{
+            strcpy(tmp_token,token);
+        }
         getNextSym();
     }else if(sym==lparent){
         if(ident_name_var_funct[0]=='\0'){
@@ -658,11 +759,13 @@ void funct_ret_declaraction(int is_global,enum typs ret_typ){
     }else{
         error(13);
     }
-        //检查重命名
     if(sym!=lparent){
         error(22);
     }else{
+
+        last_local_ident_index=-1;
         parameterlist();
+        lastpar=last_local_ident_index;
         if(sym!=rparent){
             error(17);
         }else{
@@ -676,8 +779,8 @@ void funct_ret_declaraction(int is_global,enum typs ret_typ){
                     error(19);
                 }else{
                     getNextSym();
-                    enter_funct();
-                    enter_ident(tmp_token,is_global,func,typ,refer,adr);
+                    refer=enter_funct(last_local_ident_index,lastpar,0,0);
+                    enter_ident(1,tmp_token,func,typ,refer,adr);
                 }
             }
         }
@@ -686,7 +789,7 @@ void funct_ret_declaraction(int is_global,enum typs ret_typ){
 }
 void funct_main_declaraction(int is_global){
     int refer;
-    int adr;
+    int adr=0;
     if(sym==mainsy){
         getNextSym();
         if(sym!=lparent){
@@ -705,7 +808,8 @@ void funct_main_declaraction(int is_global){
                     if(sym!=rquote){
                         error(19);
                     }else{
-                        enter_funct();
+                        refer=enter_funct(last_local_ident_index,-1,0,0);
+                        enter_ident(1,"main",func,notyp,refer,adr);
                         //enter_ident(token,is_global,func,notyp,refer,adr);
                     }
                 }
@@ -717,7 +821,7 @@ void funct_main_declaraction(int is_global){
         printf("主函数定义\n");
 }
 void parameterlist(){
-    enum typs ident_typ;
+    enum types ident_typ;
     int redcl_flag=0;
     char tmp_token[LEN_OF_NAME];
     do{
@@ -733,26 +837,18 @@ void parameterlist(){
                 }
                 getNextSym();
                 if(sym==ident){
-                    //检查重命名;
+                    redcl_flag=check_redeclaraction(0,token);
                     if(redcl_flag){
                         error(36);
                     }else{
-                        if(sym!=lbrack){
-                            enter_ident(token,0,paras,ident_typ,0,0);
+                        strcpy(tmp_token,token);
+                        getNextSym();
+                        if(sym!=comma&&sym!=rparent){
+                            error(22);
                         }else{
-                            getNextSym();
-                            if(sym!=intcon){
-                                error(20);
-                            }
-                            getNextSym();
-                            if(sym!=rbrack){
-                                error(18);
-                            }
-                            enter_array();
-                            enter_ident(token,0,paras,arrays,0,0);
+                            enter_ident(0,tmp_token,paras,ident_typ,0,0);
                         }
                     }
-                    getNextSym();
                 }else{
                     error(13);
                 }
@@ -896,7 +992,7 @@ void condition(){
     printf("if或while判断条件 \n");
 }
 void assignment(char tmp_token[]){
-    enum typs ret_typ;
+    enum types ret_typ;
     int res_position=position(tmp_token);
     //tmp_token可能是数组
     if(sym==lbrack){
@@ -911,20 +1007,18 @@ void assignment(char tmp_token[]){
         }
         getNextSym();
         ret_typ=simpleexpression();
-        if(ret_typ==ints && ident_tab[res_position].typ==ints){
-            //修改符号表
-        }else if(ret_typ==chars && ident_tab[res_position].typ==chars){
-            //修改符号表
-        }else if(ret_typ==ints && ident_tab[res_position].typ==ints){
-            //修改符号表
-        }else{
-            error(11);
-        }
+        //插入运算指令
+//        if(ret_typ==ints && ident_tab[res_position].typ==ints){
+//        }else if(ret_typ==chars && ident_tab[res_position].typ==chars){
+//        }else if(ret_typ==ints && ident_tab[res_position].typ==ints){
+//        }else{
+//            error(11);
+//        }
     }
     printf("赋值语句\n");
 }
 void switch_statement(){
-    enum typs condition_typ;
+    enum types condition_typ;
     if(sym!=lparent){
         error(25);
     }else{
@@ -954,7 +1048,7 @@ void caselabel(){
         //常量
         getNextSym();
         if(sym!=intcon&&sym!=charcon){
-            error(41);
+            error(40);
         }else{
             //分号
             getNextSym();
@@ -970,7 +1064,7 @@ void caselabel(){
 }
 void onecase(){
     if(sym!=colon){
-        error(40);
+        error(41);
     }else{
         getNextSym();
         statement();
@@ -1223,44 +1317,32 @@ void selector(){
     }
     printf("数组选择器\n");
 }
-////符号表管理////
-int position(char tmp_token[]){
-    int i;
-    int res=-1;
-    for(i=ident_index-1;i>=0;i--){
-        if(!strcmp(tmp_token,ident_tab[i].name)){
-            res=i;
-            break;
-        }
-    }
-    if(res==-1){
-        i=-1;
-    }
-    return i;
-}
-void enter_ident(char token[],int is_global,enum objects obj,enum typs typ,int refer,int adr){
-    return ;
-    if(ident_index>=IDENT_TAB_LEN){
-        fatal();
-    }else{
-        strcpy(ident_tab[ident_index].name,token);
-        ident_tab[ident_index].is_global=is_global;
-        ident_tab[ident_index].obj=obj;
-        ident_tab[ident_index].typ=typ;
-        ident_tab[ident_index].refer=refer;
-        ident_tab[ident_index].adr=adr;
-    }
-
-}
-void enter_array(){
-    ;
-}
-void enter_funct(){
-    ;
-}
 
 ////语义分析////
-
+int check_redeclaraction(int is_global,char ident_name[]){
+    int check_index;
+    if(is_global){
+        check_index=global_ident_index-1;
+        while(check_index>=0){
+            if(strcmp(global_ident_tab[check_index].name,ident_name)==0){
+                return 1;
+            }
+            check_index--;
+        }
+        return 0;
+    }else{
+        check_index=last_local_ident_index;
+        while(check_index!=-1){
+            if(strcmp(local_ident_tab[check_index].name,ident_name)==0){
+                return 1;
+            }else{
+                check_index=local_ident_tab[check_index].link;
+            }
+        }
+        return 0;
+    }
+    return 0;
+}
 ////生成四元式////
 
 ////代码优化////

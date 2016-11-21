@@ -26,7 +26,7 @@ char* errormsg[ERROR_NUM]={
         "数组长度应为无符号整数"              ,//20
         "Main函数后有多余字符或定义"          ,//21
         "参数表定义出错"                      ,//22
-        "声明头部定义错误"                    ,//23
+        "常量初始化出错"                    ,//23
         "函数体定义缺少{"                     ,//24
         "条件语句缺少("                       ,//25
         "将char值赋值给int类型标识符" 		  ,//26
@@ -46,7 +46,7 @@ char* errormsg[ERROR_NUM]={
         "case后应为常量"                      ,//40
         "case后应为:"                         ,//41
         "default应为:"                        ,//42
-        "未定义main函数"                       //43
+        "未定义main函数"                      //43
 };
 void error(int err_code);
 void fatal();
