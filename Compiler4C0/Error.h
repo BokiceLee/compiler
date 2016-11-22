@@ -1,6 +1,6 @@
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
-#define ERROR_NUM 44
+#define ERROR_NUM 46
 #define SET_LEN 20
 char errormsg[ERROR_NUM][40]={
         "数字以0开头"						  ,//0
@@ -47,7 +47,8 @@ char errormsg[ERROR_NUM][40]={
         "case后应为:"                         ,//41
         "default应为:"                        ,//42
         "未定义main函数"                      ,//43
-        "main函数返回类型为void"               //44
+        "main函数返回类型为void"              ,//44
+        "错误的结束字符"
 };
 void error(int err_code);
 void fatal();

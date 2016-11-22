@@ -568,12 +568,14 @@ void constdeclaraction(int fsys[],int fsys_len,int is_global){
             stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
             constdefinition(stop_set,stop_set_len,is_global);
             needsym(semicolon);
+            stop_set2_len=merge_sym_set(stop_set2,stop_set2_len,fsys,fsys_len);
+            test(stop_set2,stop_set2_len,NULL,0,31);
         }else{
             error(14);
+            stop_set2_len=merge_sym_set(stop_set2,stop_set2_len,fsys,fsys_len);
             test(stop_set,stop_set_len,fsys,fsys_len,-1);
+            needsym(semicolon);
         }
-        stop_set2_len=merge_sym_set(stop_set2,stop_set2_len,fsys,fsys_len);
-        test(stop_set2,stop_set2_len,NULL,0,31);
         printf("常量说明\n");
     }while(sym==constsy);
 }
@@ -583,7 +585,7 @@ void constdefinition(int fsys[],int fsys_len,int is_global){
     char tmp_token[LEN_OF_NAME];
     int value=0;
     int positive;
-    int stop_set[SET_LEN]={comma};
+    int stop_set[SET_LEN]={comma,semicolon};
     int stop_set_len=1;
     if(sym==intsy){//进来肯定是常量声明，sym肯定是int或char
         ident_typ=ints;
@@ -635,6 +637,7 @@ void constdefinition(int fsys[],int fsys_len,int is_global){
                         error(11);//comma
                         test(stop_set,stop_set_len,fsys,fsys_len,-1);
                     }
+                    test(stop_set,stop_set_len,fsys,fsys_len,-1);
                 }else{
                     error(12);//comma
                     test(stop_set,stop_set_len,fsys,fsys_len,-1);
@@ -663,7 +666,7 @@ void vardeclaraction(int fsys[],int fsys_len,int is_global){
             ident_typs=chars;
         }
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-        vardefinition(fsys,fsys_len,is_global);
+        vardefinition(stop_set,stop_set_len,is_global);
         if(sym==lparent){
             break;
         }else{
@@ -678,8 +681,8 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
     enum types ident_typs;
     int redcl_flag=0;
     char tmp_token[LEN_OF_NAME];
-    int stop_set[SET_LEN]={comma};
-    int stop_set_len=1;
+    int stop_set[SET_LEN]={comma,semicolon};
+    int stop_set_len=2;
     int stop_set2[SET_LEN]={intcon};
     int stop_set2_len=1;
     if(sym==intsy){
@@ -705,6 +708,7 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
                 }
                 if(sym!=lbrack){
                     enter_ident(is_global,tmp_token,var,ident_typs,0,0);
+                    test(stop_set,stop_set_len,fsys,fsys_len,45);
                 }else{
                     getNextSym();
                     if(sym!=intcon){
@@ -722,6 +726,7 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
                         enter_array(num_read);
                         getNextSym();
                         needsym(rbrack);
+                        test(stop_set,stop_set_len,fsys,fsys_len,45);
                     }
                 }
             }
