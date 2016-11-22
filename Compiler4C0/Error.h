@@ -1,8 +1,8 @@
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
-#define ERROR_NUM 10
+#define ERROR_NUM 44
 #define SET_LEN 20
-char* errormsg[ERROR_NUM]={
+char errormsg[ERROR_NUM][40]={
         "数字以0开头"						  ,//0
         "数字以字母结尾"                      ,//1
         "数字太大"                            ,//2

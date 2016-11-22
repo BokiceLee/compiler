@@ -133,6 +133,7 @@ int enter_funct(int last,int lastpar,int psize,int vsize){
 }
 ////出错处理////
 int errors=0;
+int end_right=0;
 ////出错处理////
 void error(int error_code){
     switch(error_code){
@@ -159,7 +160,6 @@ void error(int error_code){
     case 8:
         break;
     }
-    return;
     printf("error at row %d,column %d:\n",row_in_source_file,column_in_source_file);
     printf("error:%d ~~~~~error message:%s\n",++errors,errormsg[error_code]);
 }
@@ -210,7 +210,7 @@ void test(int legal_set[],int legal_set_len,int stop_set[],int stop_set_len,int 
 }
 void needsym(int sym_need){
     if(sym!=sym_need){
-        switch(sym){
+        switch(sym_need){
             case semicolon:
                 error(15);
                 break;
@@ -324,8 +324,7 @@ int is_digital(char c){
 }
 void getNextCh(){
     if(end_flag){
-        error(8);
-        exit(0);
+        return;
     }
     if(return_temp==1){
         return_temp=0;
@@ -513,6 +512,9 @@ void getNextSym(){
                 sym=gtr;
             }
             break;
+        case -1:
+            sym=-1;
+            break;
         default:
             error(7);
             sym=illegalcon;
@@ -541,16 +543,13 @@ void program(){
         }else{
             funct_ret_declaraction(stop_set,stop_set_len,1);
         }
-    }
-    funct_main_declaraction(1);
-    while(ch!=-1){
-        getNextCh();
-        if(!is_empty_char(ch)){
-            break;
+        if(sym!=mainsy){
+            test(stop_set,stop_set_len,NULL,0,31);
         }
     }
+    funct_main_declaraction(1,NULL,0);
     printf("程序\n");
-    if(ch==-1){
+    if(sym==-1){
         printf("程序正确结束\n");
     }else{
         printf("程序未正确结束");
@@ -565,12 +564,13 @@ void constdeclaraction(int fsys[],int fsys_len,int is_global){
         }
         if(sym==intsy||sym==charsy){
             stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-            constdefinition(is_global,stop_set,stop_set_len);
+            constdefinition(stop_set,stop_set_len,is_global);
             needsym(semicolon);
         }else{
             error(14);
             test(stop_set,stop_set_len,fsys,fsys_len,-1);
         }
+        test(stop_set,stop_set_len,fsys,fsys_len);
         printf("常量说明\n");
     }while(sym==constsy);
 }
@@ -580,7 +580,7 @@ void constdefinition(int fsys[],int fsys_len,int is_global){
     char tmp_token[LEN_OF_NAME];
     int value=0;
     int positive;
-    int stop_set={comma};
+    int stop_set[SET_LEN]={comma};
     int stop_set_len=1;
     if(sym==intsy){//进来肯定是常量声明，sym肯定是int或char
         ident_typ=ints;
@@ -660,6 +660,9 @@ void vardeclaraction(int fsys[],int fsys_len,int is_global){
             break;
         }else{
             needsym(semicolon);
+        }
+        if(is_global){
+            test(stop_set,stop_set_len,fsys,fsys_len,31);
         }
     }while(sym==intsy||sym==charsy);
 }
@@ -742,6 +745,7 @@ void funct_void_declaraction(int fsys[],int fsys_len){
             }else{
                 last_local_ident_index=-1;
                 stop_set3_len=merge_sym_set(stop_set3,stop_set3_len,fsys,fsys_len);
+                getNextSym();
                 parameterlist(stop_set3,stop_set3_len);
                 needsym(rparent);
                 lastpar=local_ident_index;
@@ -755,7 +759,6 @@ void funct_void_declaraction(int fsys[],int fsys_len){
                 needsym(rquote);//不管,应该不会出现
                 refer=enter_funct(last_local_ident_index,lastpar,0,0);
                 enter_ident(1,tmp_token,func,notyp,refer,adr);
-                getNextSym();
             }
         }
         printf("无返回值函数定义\n");
@@ -831,8 +834,7 @@ void funct_ret_declaraction(int fsys[],int fsys_len){
         needsym(rquote);
         refer=enter_funct(last_local_ident_index,lastpar,0,0);
         enter_ident(1,tmp_token,func,typ,refer,adr);
-        getNextSym();
-            printf("有返回值函数定义\n");
+        printf("有返回值函数定义\n");
     }
 }
 void funct_main_declaraction(int fsys[],int fsys_len){
@@ -863,10 +865,10 @@ void funct_main_declaraction(int fsys[],int fsys_len){
         }
         merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
         compound_statement(stop_set,stop_set_len);
-        needsym(rquote);
         refer=enter_funct(last_local_ident_index,-1,0,0);
         enter_ident(1,"main",func,notyp,refer,adr);
         //enter_ident(token,is_global,func,notyp,refer,adr);
+        needsym(rquote);
     }else{
         error(43);//不管
     }
@@ -927,6 +929,7 @@ void statement(int fsys[],int fsys_len){
     int stop_set[SET_LEN]={rquote};
     int stop_set_len=1;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
+    //test(fsys,fsys_len,NULL,0,-1);
     switch(sym){
         case ifsy:
             getNextSym();
@@ -946,10 +949,10 @@ void statement(int fsys[],int fsys_len){
             getNextSym();
             if(sym==lbrack){
                 getNextSym();
-                selector();
+                selector(fsys,fsys_len);
             }
             if(sym==becomes){
-                assignment(tmp_token);
+                assignment(fsys,fsys_len,tmp_token);
             }else if(sym==lparent){
                 getNextSym();
                 funct_call(fsys,fsys_len,tmp_token);
@@ -984,7 +987,6 @@ void statement(int fsys[],int fsys_len){
         default:
             break;
     }
-    test(fsys,fsys_len,NULL,0,-1);
 printf("语句\n");
 }
 void statements(int fsys[],int fsys_len){
@@ -1041,7 +1043,7 @@ void while_statement(int fsys[],int fsys_len){
 }
 void condition(int fsys[],int fsys_len){
     enum symbol tmp_sym;
-    int stop_set={eql,neq,gtr,geq,lss,leq};
+    int stop_set[SET_LEN]={eql,neq,gtr,geq,lss,leq};
     int stop_set_len=6;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     simpleexpression(stop_set,stop_set_len);
@@ -1059,9 +1061,9 @@ void condition(int fsys[],int fsys_len){
     //打标签
     printf("if或while判断条件 \n");
 }
-void assignment(char tmp_token[],int fsys[],int fsys_len){
+void assignment(int fsys[],int fsys_len,char tmp_token[]){
     enum types ret_typ;
-    int stop_set={becomes};
+    int stop_set[SET_LEN]={becomes};
     int stop_set_len=1;
     int res_position=position(tmp_token);
     //tmp_token可能是数组
@@ -1093,9 +1095,9 @@ void assignment(char tmp_token[],int fsys[],int fsys_len){
 }
 void switch_statement(int fsys[],int fsys_len){
     enum types condition_typ;
-    int stop_set={rparent};
+    int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
-    int stop_set2={rquote};
+    int stop_set2[SET_LEN]={rquote};
     int stop_set2_len=1;
     if(sym!=lparent){
         error(25);
@@ -1169,7 +1171,14 @@ void scanf_statement(int fsys[],int fsys_len){
     }else{
         getNextSym();
     }
+    if(sym!=ident){
+        error(30);
+        test(stop_set,stop_set_len,fsys,fsys_len,-1);
+    }
     do{
+        if(sym==comma){
+            getNextSym();
+        }
         if(sym!=ident){
             error(30);
             test(stop_set,stop_set_len,fsys,fsys_len,-1);
@@ -1189,7 +1198,7 @@ printf("读语句\n");
 }
 void printf_statement(int fsys[],int fsys_len){
     int res_position;
-    int stop_set={rparent};
+    int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
     if(sym!=lparent){
         error(29);
@@ -1211,96 +1220,9 @@ void printf_statement(int fsys[],int fsys_len){
     }
     printf("写语句\n");
 }
-int factor(int fsys[],int fsys_len){
-    int res_position;
-    char tmp_token[LEN_OF_NAME];
-    int legal_set[SET_LEN]={lparent,ident,intcon,charcon};
-    int legal_set_len=4;
-    int stop_set={rparent};
-    int stop_set_len=1;
-    //test
-    test(legal_set,legal_set_len,fsys,fsys_len,31);
-    if(sym==ident||sym==intcon||sym==charcon){
-        if(sym==ident){
-            strcpy(tmp_token,token);
-            res_position=position(token);
-            if(res_position==-1){
-                error(32);
-                getNextSym();
-                test(fsys,fsys_len,NULL,0,-1);
-            }else{
-                getNextSym();
-                if(sym==lbrack){
-                    getNextSym();
-                    selector(fsys,fsys_len);
-                }else if(sym==lparent){
-                    getNextSym();
-                    funct_call(fsys,fsys_len,tmp_token);
-                }else{
-//                switch(ident_tab[res_position].typ){
-//                case con://相应生成操作
-//                    break;
-//                case var:
-//                    switch(ident_tab[res_position].obj){
-//                    case ints:
-//                        break;
-//                    case chars:
-//                        break;
-//                    case arrays:
-//                        break;
-//                    }
-//                    break;
-//                case func:
-//                    switch(ident_tab[res_position].obj){
-//                    case notyp:
-//                        error(37);
-//                        break;
-//                    case ints:
-//                        break;
-//                    case chars:
-//                        break;
-//                    }
-//                    break;
-//                 case array:
-//                }
-                }
-            }
-        }else{
-            //插入加载常量操作
-            getNextSym();
-        }
-    }else if(sym==lparent){
-        getNextSym();
-        stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-        simpleexpression(stop_set,stop_set_len);
-        needsym(rparent);
-    }
-    printf("因子\n");
-    return notyp;
-}
-int term(int fsys[],int fsys_len){
-    enum symbol fac_op;
-    int stop_set[SET_LEN]={times,idiv};
-    int stop_set_len=2;
-    stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    factor(stop_set,stop_set_len);
-    while(times==sym||idiv==sym){
-        fac_op=sym;
-        getNextSym();
-        factor(stop_set,stop_set_len);
-        //插入相应操作
-        if(fac_op==times){
-            ;
-        }else{
-            ;
-        }
-    }
-printf("项\n");
-    return notyp;
-}
 int simpleexpression(int fsys[],int fsys_len){
     enum symbol positive;
-    int stop_set[]={pluss,minuss};
+    int stop_set[SET_LEN]={pluss,minuss};
     int stop_set_len=2;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==pluss||sym==minuss){
@@ -1324,8 +1246,70 @@ int simpleexpression(int fsys[],int fsys_len){
         }
     }
     printf("表达式\n");
-    return notyp;
+    return 0;
 }
+int factor(int fsys[],int fsys_len){
+    int res_position;
+    char tmp_token[LEN_OF_NAME];
+    int legal_set[SET_LEN]={lparent,ident,intcon,charcon};
+    int legal_set_len=4;
+    int stop_set[SET_LEN]={rparent};
+    int stop_set_len=1;
+    //test
+    test(legal_set,legal_set_len,fsys,fsys_len,31);
+    if(sym==ident||sym==intcon||sym==charcon){
+        if(sym==ident){
+            strcpy(tmp_token,token);
+            res_position=position(token);
+            if(res_position==-1){
+                error(32);
+                getNextSym();
+                test(fsys,fsys_len,NULL,0,-1);
+            }else{
+                getNextSym();
+                if(sym==lbrack){
+                    getNextSym();
+                    selector(fsys,fsys_len);
+                }else if(sym==lparent){
+                    getNextSym();
+                    funct_call(fsys,fsys_len,tmp_token);
+                }else{
+                }
+            }
+        }else{
+            //插入加载常量操作
+            getNextSym();
+        }
+    }else if(sym==lparent){
+        getNextSym();
+        stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
+        simpleexpression(stop_set,stop_set_len);
+        needsym(rparent);
+    }
+    printf("因子\n");
+    return 0;
+}
+int term(int fsys[],int fsys_len){
+    enum symbol fac_op;
+    int stop_set[SET_LEN]={times,idiv};
+    int stop_set_len=2;
+    stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
+    factor(stop_set,stop_set_len);
+    while(times==sym||idiv==sym){
+        fac_op=sym;
+        getNextSym();
+        factor(stop_set,stop_set_len);
+        //插入相应操作
+        if(fac_op==times){
+            ;
+        }else{
+            ;
+        }
+    }
+printf("项\n");
+    return 0;
+}
+
 void return_statement(int fsys[],int fsys_len){
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
