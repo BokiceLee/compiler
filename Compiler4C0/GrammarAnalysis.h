@@ -1,7 +1,7 @@
 #ifndef GRAMMARANALYSIS_H_INCLUDED
 #define GRAMMARANALYSIS_H_INCLUDED
 void program();
-void constdeclaraction();
+void constdeclaraction(int is_global,int fsys[],int fsys_len);
 void constdefinition();
 void vardeclaraction();
 void vardefinition();

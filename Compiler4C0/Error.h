@@ -46,12 +46,13 @@ char* errormsg[ERROR_NUM]={
         "case后应为常量"                      ,//40
         "case后应为:"                         ,//41
         "default应为:"                        ,//42
-        "未定义main函数"                      //43
+        "未定义main函数"                      ,//43
+        "main函数返回类型为void"               //44
 };
 void error(int err_code);
 void fatal();
 int search_sym_in_set(int sym_set[],int set_len);
-void merge_sym_set(int s1[],int s1_len,int s2[],int s2_len);
+int merge_sym_set(int s1[],int s1_len,int s2[],int s2_len);
 void skip(int sym_set[],int set_len,int err_code);
 void test(int legal_set[],int legal_set_len,int stop_set[],int stop_set_len,int err_code);
 void testsemicolon();
