@@ -558,6 +558,8 @@ void program(){
 void constdeclaraction(int fsys[],int fsys_len,int is_global){
     int stop_set[SET_LEN]={semicolon};
     int stop_set_len=1;
+    int stop_set2[SET_LEN]={semicolon,constsy};
+    int stop_set2_len=2;
     do{
         if(sym==constsy){//可以不要
             getNextSym();
@@ -570,7 +572,8 @@ void constdeclaraction(int fsys[],int fsys_len,int is_global){
             error(14);
             test(stop_set,stop_set_len,fsys,fsys_len,-1);
         }
-        test(stop_set,stop_set_len,fsys,fsys_len);
+        stop_set2_len=merge_sym_set(stop_set2,stop_set2_len,fsys,fsys_len);
+        test(stop_set2,stop_set2_len,NULL,0,31);
         printf("常量说明\n");
     }while(sym==constsy);
 }
@@ -648,6 +651,11 @@ void vardeclaraction(int fsys[],int fsys_len,int is_global){
     enum types ident_typs;
     int stop_set[SET_LEN]={semicolon,lparent};
     int stop_set_len=2;
+    if(is_global){
+        stop_set[stop_set_len++]=intsy;
+        stop_set[stop_set_len++]=charsy;
+        stop_set[stop_set_len++]=voidsy;
+    }
     do{
         if(sym==intsy){
             ident_typs=ints;
@@ -672,6 +680,8 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
     char tmp_token[LEN_OF_NAME];
     int stop_set[SET_LEN]={comma};
     int stop_set_len=1;
+    int stop_set2[SET_LEN]={intcon};
+    int stop_set2_len=1;
     if(sym==intsy){
         ident_typs=ints;
     }else{
@@ -699,8 +709,12 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
                     getNextSym();
                     if(sym!=intcon){
                         error(20);
-                        test(stop_set,stop_set_len,fsys,fsys_len,-1);
+                        test(stop_set2,stop_set2_len,fsys,fsys_len,-1);
+                        if(sym==intcon){
+                            goto int_label;
+                        }
                     }else{
+                    int_label:
                         if(num_read==0){
                             error(20);//不管
                         }
