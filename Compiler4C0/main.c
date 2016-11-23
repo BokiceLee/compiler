@@ -1006,17 +1006,15 @@ void statement(int fsys[],int fsys_len){
         default:
             break;
     }
+    test(fsys,fsys_len,NULL,0,-1);
 printf("语句\n");
 }
 void statements(int fsys[],int fsys_len){
     char tmp_token[LEN_OF_NAME];
-    int stop_set[SET_LEN]={rquote,semicolon};//每个语句后面都可以有分号，因此加一个semicolon，实际上应该是在statement中加
-    int stop_set_len=2;
-    int statbegsys[SET_LEN]={ident,ifsy,whilesy,lquote,scanfsy,printfsy,switchsy,returnsy,semicolon};
-    int statbegsys_len=9;
+    int stop_set[SET_LEN]={ident,ifsy,whilesy,lquote,scanfsy,printfsy,switchsy,returnsy,semicolon,rquote};
+    int stop_set_len=10;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    statement(stop_set,stop_set_len);
-    while(search_sym_in_set(statbegsys,statbegsys_len)){
+    while(sym!=rquote){
         if(sym==semicolon){
             getNextSym();
         }
