@@ -33,5 +33,5 @@ void enter_ident(int is_global,char name[],int obj,int typ,int refer,int adr);
 void enter_array(int high);
 void enter_string();
 int enter_funct(int last,int lastpar,int psize,int vsize);
-int position(char token[]);
+int position(char tmp_token[],int *is_global);
 #endif // SYMBOLMANAGEMENT_H_INCLUDED
