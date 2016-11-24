@@ -82,17 +82,19 @@ int array_tab[LEN_OF_ARRAY_TAB];
 int array_tab_index=0;
 int position_res_global_flag;
 ////符号表管理////
-int position(char tmp_token[]){
+int position(char tmp_token[],int &is_global){
     int i;
     for(i=local_ident_index-1;i>=0;i--){
         if(strcmp(tmp_token,local_ident_tab[i].name)==0){
             position_res_global_flag=0;
+            *is_global=0;
             return i;
         }
     }
     for(i=global_ident_index-1;i>=0;i--){
         if(strcmp(tmp_token,global_ident_tab[i].name)==0){
             position_res_global_flag=1;
+            *is_global=1;
             return i;
         }
     }
@@ -471,6 +473,7 @@ void getNextSym(){
                         error(5);
                     }
                 }else{
+                    string_tab[table_table_index][string_index]='\0';
                     string_table_index++;
                 }
             }while(ch!='"');
@@ -685,6 +688,8 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
     int stop_set_len=2;
     int stop_set2[SET_LEN]={intcon};
     int stop_set2_len=1;
+    char iname[VAR_LEN];
+    char array_len[VAR_LEN];
     if(sym==intsy){
         ident_typs=ints;
     }else{
@@ -708,6 +713,8 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
                 }
                 if(sym!=lbrack){
                     enter_ident(is_global,tmp_token,var,ident_typs,0,0);
+                    convert_name(iname,tmp_token,is_global);
+                    gen_quaternary(op_var_dcl,iname,"","");
                     test(stop_set,stop_set_len,fsys,fsys_len,45);
                 }else{
                     getNextSym();
@@ -723,7 +730,10 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
                             error(20);//不管
                         }
                         enter_ident(is_global,tmp_token,arrays,ident_typs,array_tab_index,0);
-                        enter_array(num_read);
+                        enter_array(num_read);//？
+                        convert_name(iname,tmp_token,is_global);
+                        insert2name(array_len,num_read,ints);
+                        gen_quaternary(array_dcl,iname,array_len,"");
                         getNextSym();
                         needsym(rbrack);
                         test(stop_set,stop_set_len,fsys,fsys_len,45);
@@ -762,6 +772,7 @@ void funct_void_declaraction(int fsys[],int fsys_len){
                 test(fsys,fsys_len,NULL,0,-1);
                 return;
             }else{
+                gen_quaternary(op_func,tmp_token,"","");
                 last_local_ident_index=-1;
                 stop_set3_len=merge_sym_set(stop_set3,stop_set3_len,fsys,fsys_len);
                 getNextSym();
@@ -778,6 +789,8 @@ void funct_void_declaraction(int fsys[],int fsys_len){
                 needsym(rquote);//不管,应该不会出现
                 refer=enter_funct(last_local_ident_index,lastpar,0,0);
                 enter_ident(1,tmp_token,func,notyp,refer,adr);
+                gen_quaternary(op_ret_void,"","","");
+                gen_quaternary(op_efunc,tmp_token,"","");
             }
         }
         printf("无返回值函数定义\n");
@@ -837,6 +850,7 @@ void funct_ret_declaraction(int fsys[],int fsys_len){
         error(22);
         test(fsys,fsys_len,NULL,0,-1);
     }else{
+        gen_quaternary(op_func,tmp_token,"","");
         last_local_ident_index=-1;
         stop_set3_len=merge_sym_set(stop_set3,stop_set3_len,fsys,fsys_len);
         getNextSym();
@@ -853,6 +867,8 @@ void funct_ret_declaraction(int fsys[],int fsys_len){
         needsym(rquote);
         refer=enter_funct(last_local_ident_index,lastpar,0,0);
         enter_ident(1,tmp_token,func,typ,refer,adr);
+        gen_quaternary(op_ret_value,"","","");
+        gen_quaternary(op_efunc,tmp_token,"","");
         printf("有返回值函数定义\n");
     }
 }
@@ -870,6 +886,7 @@ void funct_main_declaraction(int fsys[],int fsys_len){
         }else{
             getNextSym();
         }
+        gen_quaternary(op_main,"","","");
         last_local_ident_index=-1;
         stop_set3_len=merge_sym_set(stop_set3,stop_set3_len,fsys,fsys_len);
         parameterlist(stop_set3,stop_set3_len);
@@ -888,6 +905,8 @@ void funct_main_declaraction(int fsys[],int fsys_len){
         enter_ident(1,"main",func,notyp,refer,adr);
         //enter_ident(token,is_global,func,notyp,refer,adr);
         needsym(rquote);
+        gen_quaternary(op_ret_void,"","","");
+        gen_quaternary(op_emain,"","","");
     }else{
         error(43);//不管
     }
@@ -899,6 +918,7 @@ void parameterlist(int fsys[],int fsys_len){
     char tmp_token[LEN_OF_NAME];
     int stop_set[SET_LEN]={rparent,comma};
     int stop_set_len=2;
+    int i=0;
     do{
         if(sym==comma){
             getNextSym();
@@ -922,7 +942,7 @@ void parameterlist(int fsys[],int fsys_len){
                     test(stop_set,stop_set_len,fsys,fsys_len,-1);
                 }else{
                     strcpy(tmp_token,token);
-                    enter_ident(0,tmp_token,paras,ident_typ,0,0);
+                    enter_ident(0,tmp_token,paras,ident_typ,0,++i);
                     getNextSym();
                 }
             }else{
@@ -1027,67 +1047,119 @@ void if_statement(int fsys[],int fsys_len){
     int stop_set1_len=1;
     int stop_set2[SET_LEN]={elsesy};
     int stop_set2_len=1;
+    int labx1,labx2;
+    int code_x1,code_x2;
     if(sym!=lparent){
         error(25);
     }else{
         getNextSym();
     }
     stop_set1_len=merge_sym_set(stop_set1,stop_set1_len,fsys,fsys_len);
-    condition(stop_set1,stop_set1_len);
+    code_x1=condition(stop_set1,stop_set1_len);
     needsym(rparent);
     stop_set2_len=merge_sym_set(stop_set2,stop_set2_len,fsys,fsys_len);
     statement(stop_set2,stop_set2_len);
-    if(sym==elsesy){
+    if(sym==elsesy){//对吗？
+        code_x2=gen_quaternary(op_jump,"","","");
+        labx2=gen_lab();
+        gen_quaternary(op_set_label,label_table[labx2],"","");
+        strcpy(quat_table[code_x1],label_table[labx2]);
         getNextSym();
         statement(fsys,fsys_len);
-printf("if 中 else\n");
+        labx1=gen_lab();
+        gen_quaternary(op_set_label,label_table[labx1],"","");
+        strcpy(quat_table[code_x2].dest,label_table[labx1]);
+        printf("if 中 else\n");
+    }else{
+        labx1=gen_lab();
+        gen_quaternary(op_set_label,label_table[labx1],"","");
+        strcpy(quat_table[code_x1].dest,label_table[labx1]);
     }
 printf("if 语句\n");
 }
 void while_statement(int fsys[],int fsys_len){
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
+    int lab_x1,lab_x2;
+    int codex;
     if(sym!=lparent){
         error(25);
     }else{
         getNextSym();
     }
+    lab_x1=gen_lab();
+    gen_quaternary(op_set_label,label_table[lab_x1],"","");
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    condition(stop_set,stop_set_len);
+    codex=condition(stop_set,stop_set_len);
     needsym(rparent);
     statement(fsys,fsys_len);
+    gen_quaternary(op_jump,label_table[lab_x1],"","");
+    lab_x2=gen_lab();
+    gen_quaternary(op_set_label,label_table[lab_x2],"","");
+    strcpy(quat_table[codex].dest,label_table[lab_x2]);
     printf("while 语句\n");
 }
 void condition(int fsys[],int fsys_len){
     enum symbol tmp_sym;
     int stop_set[SET_LEN]={eql,neq,gtr,geq,lss,leq};
     int stop_set_len=6;
+    char sname1[VAR_LEN],sname2[VAR_LEN];
+    int &stype1,&stype2;
+    int code_x;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    simpleexpression(stop_set,stop_set_len);
+    simpleexpression(stop_set,stop_set_len,stype1,sname1);
     if(sym==eql||sym==neq||sym==gtr||sym==geq||sym==lss||sym==leq){
         tmp_sym=sym;
         getNextSym();
-        simpleexpression(fsys,fsys_len);
+        simpleexpression(fsys,fsys_len,stype2,sname2);
         switch(tmp_sym){
         case eql://根据不同情况生成指令
+            code_x=gen_quaternary(op_bne,"",sname1,sname2);
             break;
-        default:
+        case neq:
+            code_x=gen_quaternary(op_beq,"",sname1,sname2);
+            break;
+        case gtr:
+            code_x=gen_quaternary(op_ble,"",sname1,sname2);
+            break;
+        case geq:
+            code_x=gen_quaternary(op_bls,"",sname1,sname2);
+            break;
+        case lss:
+            code_x=gen_quaternary(op_bge,"",sname1,sname2);
+            break;
+        case leq:
+            code_x=gen_quaternary(op_bgt,"",sname1,sname2);
             break;
         }
+    }else{
+        code_x=gen_quaternary(op_ble,"",sname1,"$0");
     }
     //打标签
     printf("if或while判断条件 \n");
+    return code_x;
 }
 void assignment(int fsys[],int fsys_len,char tmp_token[]){
-    enum types ret_typ;
     int stop_set[SET_LEN]={becomes};
     int stop_set_len=1;
-    int res_position=position(tmp_token);
+    int &is_global;
+    int res_position=position(tmp_token,is_global);
+    int &stype;
+    char sname[VAR_LEN];
+    int &seltype;
+    char selname[VAR_LEN];
+    char target_name[VAR_LEN];
+    char basename[VAR_LEN];
+    int is_arr=0;
     //tmp_token可能是数组
     if(sym==lbrack){
+        is_arr=1;
         getNextSym();
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-        selector(stop_set,stop_set_len);
+        selector(stop_set,stop_set_len,seltype,selname);
+        gen_name(target_name);
+        convert_name(basename,tmp_token,*is_global);
+        gen_quaternary(op_arr,target_name,basename,selname);
     }
     if(sym!=becomes){
         error(12);
@@ -1098,7 +1170,11 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
             test(fsys,fsys_len,NULL,0,-1);
         }else{
             getNextSym();
-            ret_typ=simpleexpression(fsys,fsys_len);
+            simpleexpression(fsys,fsys_len,stype,sname);
+            if(is_arr==0){
+                convert_name(target_name,tmp_token,*is_global);
+            }
+            gen_quaternary(op_mov,target_name,sname);
             //插入运算指令
     //        if(ret_typ==ints && ident_tab[res_position].typ==ints){
     //        }else if(ret_typ==chars && ident_tab[res_position].typ==chars){
@@ -1111,18 +1187,19 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
     printf("赋值语句\n");
 }
 void switch_statement(int fsys[],int fsys_len){
-    enum types condition_typ;
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
     int stop_set2[SET_LEN]={rquote};
     int stop_set2_len=1;
+    char sname[VAR_LEN];
+    int &stype;
     if(sym!=lparent){
         error(25);
     }else{
         getNextSym();
     }
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    condition_typ=simpleexpression(stop_set,stop_set_len);
+    simpleexpression(stop_set,stop_set_len,stype,sname);
     needsym(rparent);
     if(sym!=lquote){
         error(24);
@@ -1130,13 +1207,18 @@ void switch_statement(int fsys[],int fsys_len){
         getNextSym();
     }
     stop_set2_len=merge_sym_set(stop_set2,stop_set2_len,fsys,fsys_len);
-    caselabel(stop_set2,stop_set2_len);//onst?
+    caselabel(stop_set2,stop_set2_len,stype,sname);//onst?
     needsym(rquote);
     printf("情况语句\n");
 }
-void caselabel(int fsys[],int fsys_len){
+void caselabel(int fsys[],int fsys_len,int &stype,char sname[]){
     int stop_set[SET_LEN]={casesy,defaultsy};
     int stop_set_len=2;
+    int con_name[VAR_LEN];
+    int lab_finish;
+    int labx[SW];
+    int i=0;
+    int case_begin[SW],case_end[SW];
     test(stop_set,stop_set_len,fsys,fsys_len,27);
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==casesy){
@@ -1147,8 +1229,18 @@ void caselabel(int fsys[],int fsys_len){
                 test(stop_set,2,fsys,fsys_len,-1);
             }else{
                 //分号
+                if(sym==intcon){
+                    insert2name(con_name,num_read,ints);
+                }else{
+                    insert2name(con_name,token[0],chars);
+                }
+                labx[i]=gen_lab();
+                gen_quaternary(op_set_label,label_table[labx[i],"","");
+                case_begin[i]=gen_quaternary(op_bne,"",sname,con_name);
                 getNextSym();
                 onecase(stop_set,stop_set_len);
+                case_end[i]=gen_quaternary(op_jump,"","","");
+                i++;
                 //打标签
             }
         }while(sym==casesy);
@@ -1156,8 +1248,26 @@ void caselabel(int fsys[],int fsys_len){
         error(27);
     }
     if(sym==defaultsy){
+        lab[i]=gen_lab();
+        gen_quaternary(op_set_label,label_table[lab[i],"","");
         getNextSym();
         defaultcase(fsys,fsys_len);
+        lab_finish=gen_lab();
+        gen_quaternary(op_set_label,label_table[lab_finish],"","");
+        while(i>0){
+            strcpy(quat_table[case_begin[i-1].dest,label_table[labx[i]);
+            strcpy(quat_table[case_end[i-1].dest,label_table[lab_finish]);
+            i--;
+        }
+    }else{
+        lab_finish=gen_lab();
+        lab[i]=lab_finish;
+        gen_quaternary(op_set_label,label_table[lab_finish],"","");
+        while(i>0){
+            strcpy(quat_table[case_begin[i-1]].dest,label_table[labx[i]]);
+            strcpy(quat_table[case_end[i-1]].dest,label_table[labx[lab_finish]);
+            i--;
+        }
     }
     printf("情况表\n");
 }
@@ -1183,6 +1293,7 @@ void scanf_statement(int fsys[],int fsys_len){
     int stop_set[SET_LEN]={comma,rparent};
     int stop_set_len=2;
     int res_position;
+    int &is_global;
     if(sym!=lparent){
         error(29);
     }else{
@@ -1200,12 +1311,24 @@ void scanf_statement(int fsys[],int fsys_len){
             error(30);
             test(stop_set,stop_set_len,fsys,fsys_len,-1);
         }else{
-            res_position=position(token);
+            res_position=position(token,is_global);
             if(res_position==-1){
                 error(32);
                 test(stop_set,stop_set_len,fsys,fsys_len,-1);
             }else{
-                //插入读指令
+                if(is_global){
+                    if(global_ident_tab[res_position].typ==ints){
+                        gen_quaternary(op_scanfi,token,"","");
+                    }else{
+                        gen_quaternary(op_scanfc,token,"","");
+                    }
+                }else{
+                    if(local_ident_tab[res_position].typ==ints){
+                        gen_quaternary(op_scanfi,token,"","");
+                    }else{
+                        gen_quaternary(op_scanfc,token,"","");
+                    }
+                }
                 getNextSym();
             }
         }
@@ -1217,6 +1340,9 @@ void printf_statement(int fsys[],int fsys_len){
     int res_position;
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
+    char string_name[VAR_LEN];
+    char sname[VAR_LEN];
+    int &stype;
     if(sym!=lparent){
         error(29);
     }else{
@@ -1224,114 +1350,174 @@ void printf_statement(int fsys[],int fsys_len){
     }
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==stringcon){
-        //处理字符串
+        gen_string_name(string_name);
+        gen_quaternary(op_prints,string_name,"","");
         getNextSym();
         if(sym==comma){
             getNextSym();
-            simpleexpression(stop_set,stop_set_len);
+            simpleexpression(stop_set,stop_set_len,stype,sname);
+            if(*stype==ints){
+                gen_quaternary(op_printi,sname,"","");
+            }else{
+                gen_quaternary(op_printc,sname,"","");
+            }
         }
         needsym(rparent);
     }else {
-        simpleexpression(stop_set,stop_set_len);
+        simpleexpression(stop_set,stop_set_len,stype,sname);
         needsym(rparent);
+        if(*stype==ints){
+            gen_quaternary(op_printi,sname,"","");
+        }else{
+            gen_quaternary(op_printc,sname,"","");
+        }
     }
     printf("写语句\n");
 }
-int simpleexpression(int fsys[],int fsys_len){
-    enum symbol positive;
-    int stop_set[SET_LEN]={pluss,minuss};
-    int stop_set_len=2;
-    stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    if(sym==pluss||sym==minuss){
-        positive=sym;
-        getNextSym();
-        term(stop_set,stop_set_len);
-        if(positive==minuss){
-            //插入取反操作
-        }
-    }else{
-        term(stop_set,stop_set_len);
-    }
-    while(sym==pluss||sym==minuss){
-        positive=sym;
-        getNextSym();
-        term(stop_set,stop_set_len);
-        if(positive==pluss){
-            //插入加指令
-        }else{
-            //插入减指令
-        }
-    }
-    printf("表达式\n");
-    return 0;
-}
-int factor(int fsys[],int fsys_len){
+int factor(int fsys[],int fsys_len,int &ftype,char fname[]){
     int res_position;
     char tmp_token[LEN_OF_NAME];
     int legal_set[SET_LEN]={lparent,ident,intcon,charcon};
     int legal_set_len=4;
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
+    int is_global;
+    int &seltype;
+    int selname[VAR_LEN];
+    int basename[VAR_LEN]
+    int para_n=0;
     //test
     test(legal_set,legal_set_len,fsys,fsys_len,31);
     if(sym==ident||sym==intcon||sym==charcon){
         if(sym==ident){
             strcpy(tmp_token,token);
-            res_position=position(token);
+            res_position=position(tmp_token,&is_global);
             if(res_position==-1){
                 error(32);
                 getNextSym();
                 test(fsys,fsys_len,NULL,0,-1);
             }else{
                 getNextSym();
-                if(sym==lbrack){
+                if(sym==lbrack){//数组
                     getNextSym();
-                    selector(fsys,fsys_len);
-                }else if(sym==lparent){
+                    selector(fsys,fsys_len,seltype,selname);
+                    gen_name(fname);
+                    convert_name(basename,tmp_token,*is_global);
+                    gen_quaternary(op_arr,fname,basename,selname);
+                }else if(sym==lparent){//函数调用
                     getNextSym();
-                    funct_call(fsys,fsys_len,tmp_token);
-                }else{
+                    funct_call(fsys,fsys_len,tmp_token,ftype);
+                    gen_name(fname);
+                    gen_quaternary(op_load_ret,fname,"","");
+                }else{//
+                    if(is_global){
+                        if(global_ident_tab[res_position].obj==con){
+                            insert2name(fname,global_ident_tab[res_position].adr,*ftype);
+                        }else{
+                            convert_name(fname,tmp_token,1);
+                        }
+                        *ftype=global_ident_tab[res_position].typ;
+                    }else{
+                        if(local_ident_tab[res_position].obj==paras){
+                            para_n=local_ident_tab[pos].adr;
+                            para_name(fname,para_n);
+                        }else if(local_ident_tab[res_position].obj==con){
+                            insert2name(fname,local_ident_tab[res_position].adr,*ftype);
+                        }else{
+                            convert_name(fname,tmp_token,0);
+                        }
+                        *ftype=local_ident_tab[res_position].typ;
+                    }
                 }
             }
         }else{
-            //插入加载常量操作
+            if(sym==charcon){
+                insert2name(fname,token[0],chars);
+                *ftype=chars;
+            }else{
+                insert2name(fname,num_read,ints);
+                *ftype=ints;
+            }
             getNextSym();
         }
     }else if(sym==lparent){
         getNextSym();
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-        simpleexpression(stop_set,stop_set_len);
+        simpleexpression(stop_set,stop_set_len,ftype,fname);
         needsym(rparent);
     }
     printf("因子\n");
     return 0;
 }
-int term(int fsys[],int fsys_len){
+int term(int fsys[],int fsys_len,int &type,char tname[]){
     enum symbol fac_op;
     int stop_set[SET_LEN]={times,idiv};
     int stop_set_len=2;
+    char fname1[VAR_LEN],fname2[VAR_LEN];
+    int &ftype1,&ftype2;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    factor(stop_set,stop_set_len);
+    factor(stop_set,stop_set_len,&ftype1,fname1);
     while(times==sym||idiv==sym){
         fac_op=sym;
         getNextSym();
-        factor(stop_set,stop_set_len);
-        //插入相应操作
+        factor(stop_set,stop_set_len,&ftype2,fname2);
+        gen_name(tname);
         if(fac_op==times){
-            ;
+            gen_quaternary(op_mul,tname,fname1,fname2);
         }else{
-            ;
+            gen_quaternary(op_idiv,tname,fname1,fname2);
         }
+        fname1=tname;
     }
-printf("项\n");
+    strcpy(tname,fname1);
+    printf("项\n");
     return 0;
 }
-
+int simpleexpression(int fsys[],int fsys_len,int &sype,char sname[]){
+    enum symbol positive;
+    int stop_set[SET_LEN]={pluss,minuss};
+    int stop_set_len=2;
+    char tname1[VAR_LEN],tname2[VAR_LEN];
+    int &ttype1,&ttype2;
+    stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
+    if(sym==pluss||sym==minuss){
+        positive=sym;
+        getNextSym();
+        term(stop_set,stop_set_len,&ttype1,tname1);
+        if(positive==minuss){
+            //插入取反操作
+            gen_name(tname2);
+            gen_quaternary(op_sub,tname2,"$0",tname1);
+        }
+    }else{
+        term(stop_set,stop_set_len,ttype2,tname2);
+    }
+    while(sym==pluss||sym==minuss){
+        gen_name(sname);
+        positive=sym;
+        getNextSym();
+        term(stop_set,stop_set_len,&stype,tname1);
+        if(positive==pluss){
+            //插入加指令
+            gen_quaternary(op_add,sname,tname2,tname1);
+        }else{
+            //插入减指令
+            gen_quaternary(op_sub,sname,tname2,tname1);
+        }
+        tname2=sname;
+    }
+    strcpy(sname,tname2);
+    printf("表达式\n");
+    return 0;
+}
 void return_statement(int fsys[],int fsys_len){
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
+    int &stype;
+    char sname[VAR_LEN];
     if(sym==semicolon){
-printf("返回语句\n");
+        gen_quaternary(op_ret_void,"","","");
+        printf("返回语句\n");
         return;
     }
     if(sym!=lparent){
@@ -1340,20 +1526,57 @@ printf("返回语句\n");
         getNextSym();
     }
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    simpleexpression(stop_set,stop_set_len);
+    simpleexpression(stop_set,stop_set_len,stype,sname);
     needsym(rparent);
-printf("返回语句\n");
+    gen_quaternary(op_ret_value,sname,"","");
+    printf("返回语句\n");
 }
-void funct_call(int fsys[],int fsys_len,char funct_name[]){
+void funct_call(int fsys[],int fsys_len,char funct_name[],int &funct_type){
     int stop_set[SET_LEN]={comma,rparent};
     int stop_set_len=2;
+    int &stype;
+    char sname[MAX_PARA][VAR_LEN];
+    int i=global_ident_index-1;
+    int ref;
+    int lastpar;
+    int par_x[MAX_PARA];
+    int par_num;
+    while(i>=0){
+        if(strcmp(global_ident_tab[i].name,funct_name)==0 && global_ident_tab[i].obj==func){
+            ref=global_ident_tab[i].adr;
+            lastpar=funct_tab[ref].lastpar;
+            *funct_type=global_ident_tab[i].typ;
+            break;
+        }
+        i--;
+    }
+    if(i<0){
+        printf("%s 不是函数\n",funct_name);
+    }
+    i=-1;
+    while(lastpar!=-1){
+        par_x[++i]=lastpar;
+        lastpar=local_ident_tab[lastpar].link;
+    }
+    par_num=i;
+    if(par_num<0){
+
+    }//参数个数不匹配
     if(sym!=rparent){
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-        simpleexpression(stop_set,stop_set_len);
+        simpleexpression(stop_set,stop_set_len,stype,sname[par_num-i]);
+        i--;
+        if(local_ident_tab[par_x[i]].typ!=stype){
+            printf("类型不匹配");
+        }
         if(sym==comma){
             do{
+                if(i<0){
+                    printf("函数参数个数不等");
+                }
                 getNextSym();
-                simpleexpression(stop_set,stop_set_len);
+                simpleexpression(stop_set,stop_set_len,sname[par_num-i]);
+                i--;
             }while(sym==comma);
         }
         printf("值参数表\n");
@@ -1362,13 +1585,24 @@ void funct_call(int fsys[],int fsys_len,char funct_name[]){
         printf("参数表\n");
     }
     needsym(rparent);
+    i=par_num;
+    while(i>=0){
+        gen_quaternary(op_push,sname[i],"","");
+        i--;
+    }
+    gen_quaternary(op_call,funct_name,"","");
+    i=par_num;
+    while(i>0){
+        gen_quaternary(op_pop,"","","");
+        i--;
+    }
     printf("函数调用语句\n");
 }
-void selector(int fsys[],int fsys_len){
+void selector(int fsys[],int fsys_len,int &seltype,char selname[]){
     int stop_set[SET_LEN]={rbrack};
     int stop_set_len=1;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    simpleexpression(stop_set,stop_set_len);
+    simpleexpression(stop_set,stop_set_len,&seltype,selname);
     needsym(rbrack);
     printf("数组选择器\n");
 }
@@ -1398,8 +1632,72 @@ int check_redeclaraction(int is_global,char ident_name[]){
     }
     return 0;
 }
+//int resulttype(int &r_type,int &type1,int &type2){
+//    if(*type1==*type2){
+//        *r_type=type1;
+//        if(*r_type!=notyp){
+//            return 0;
+//        }else{
+//            return -1;
+//        }
+//    }
+//    if(*type1==ints && *type2==chars){
+//        *r_type=ints;
+//        return 1;
+//    }
+//    if(*type1==chars && *type2==ints){
+//        *r_type=;
+//    }
+}
 ////生成四元式////
-
+char label_table[LABEL_TABLE_LEN][LABEL_LEN];
+int label_index=0;
+struct quat_struct quat_table[QUAT_TABLE_LEN];
+int quat_index=0;
+int name_index=0;
+int gen_lab(){
+    sprintf(label_tmp,"label%03d",label_index++);
+    return label_index-1;
+}
+void gen_name(char name[]){
+    sprintf(name,"&%d",name_index++);
+}
+void convert_name(char dest[],char src[],int is_global){
+    if(is_global){
+        sprintf(dest,"%s",src);
+    }else{
+        sprintf(dest,"@%s",src);
+    }
+}
+void para_name(char dest[],int n){
+    sprintf(dest,"^%d",n);
+}
+void insert2name(char name[],int c,int typ){
+    if(typ==chars){
+        sprintf(name,"#%c",c);
+    }else{
+        sprintf(name,"$%d",c);
+    }
+}
+void gen_string_name(char name[]){
+    sprintf(name,"%%d",string_table_index);
+}
+int gen_quaternary(int op,char dest[],char src1[],char src2[]){
+    quat_table[quat_index].op=op;
+    strcpy(quat_table[quat_index].dest,dest);
+    strcpy(quat_table[quat_index].src1,src1);
+    strcpy(quat_table[quat_index].src2,src2);
+    quat_index++;
+    return quat_index-1;
+}
+int get_para_index(int pos){
+    int i=1;
+    while(local_ident_tab[pos].link!=-1){
+        i++;
+        pos=local_ident_tab[pos].link;
+    }
+    return i;
+}
 ////代码优化////
 
 ////生成汇编////
