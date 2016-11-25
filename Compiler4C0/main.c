@@ -21,8 +21,10 @@ int column_in_source_file=0;
 ////输入输出////
 FILE *fsource;//源代码文件指针
 FILE *ftarget;//目标代码输出文件指针
+FILE *fasm;
 char fsourcename[MAX_LEN_OF_FILE];//源代码文件名称
 char ftargetname[MAX_LEN_OF_FILE];//目标代码文件名称
+char fasm_name[]="C:\\Users\\24745\\Desktop\\res.asm";
 ////词法分析////
 char ch;//读到的字符
 enum symbol sym;
@@ -34,7 +36,7 @@ void setInputOutput(){
     set_in:
     printf("please input the absolute path of your source file(space is not available):\n");
     //scanf("%s",fsourcename);
-    fsource=fopen("E:\\StudyInSchool\\compiler\\Homework\\judgehw02\\14061110_test.txt","r");
+    fsource=fopen("E:\\StudyInSchool\\compiler\\Homework\\judgehw02\\easy_test.txt","r");
     if(NULL==fsource){
         printf("no such file\n");
         goto set_in;
@@ -59,6 +61,7 @@ void finish_compile(){
     if(output2where_console_0_file_1){
         fclose(ftarget);
     }
+    //fclose(fasm);
 }
 ////符号管理////
 int i_temp;
@@ -174,6 +177,240 @@ void outputquat(){
         printf("\n");
     }
 }
+////生成汇编////
+int qx=0;
+void gen_asm(){
+    fasm=fopen(fasm_name,"w");
+    gen_asm_head();
+    gen_asm_data(1);
+    gen_asm_code();
+}
+void gen_asm_head(){
+    int i;
+    fprintf(fasm,".386\n");
+    fprintf(fasm,".model flat,stdcall\n");
+    fprintf(fasm,"option casemap : none\n");
+    fprintf(fasm,"include C:\\masm32\\include\\windows.inc\n");
+    fprintf(fasm,"include C:\\masm32\\include\\kernel32.inc\n");
+    fprintf(fasm,"includelib C:\\masm32\\lib\\kernel32.lib\n");
+    fprintf(fasm,"include C:\\masm32\\include\\user32.inc\n");
+    fprintf(fasm,"includelib C:\\masm32\\lib\\user32.lib\n");
+    fprintf(fasm,"include C:\\masm32\\include\\msvcrt.inc\n");
+    fprintf(fasm,"includelib C:\\masm32\\lib\\msvcrt.lib\n");
+    fprintf(fasm,".data\n");
+    for(i=0;i<string_table_index;i++){
+        fprintf(fasm,"\t__STR_%03d\tDB\t'%s',0\n",i,string_tab[i]);
+    }
+    fprintf(fasm,"\t_fmt_out_s\tDB\t'%%s',0\n");
+    fprintf(fasm,"\t_fmt_out_c\tDB\t'%%c',0\n");
+    fprintf(fasm,"\t_fmt_out_i\tDB\t'%%d',0\n");
+    fprintf(fasm,"\t_fmt_in_c\tDB\t'%%c',0\n");
+    fprintf(fasm,"\t_fmt_in_i\tDB\t'%%d',0\n");
+}
+void gen_asm_data(int is_global){
+    char* s[]={"\tlocal\t%s\n","\t_%s\tDD\t0\n"};
+    char* dup_s[]={"\tlocal\t%s[%d]\n","\t_%s\tDD\t%d\tDUP(0)\n"};
+    while(quat_table[qx].op==op_var_dcl||quat_table[qx].op==op_array_dcl){
+        if(quat_table[qx].op==op_var_dcl){
+            fprintf(fasm,s[is_global],quat_table[qx].dest);
+        }else{
+            fprintf(fasm,dup_s[is_global],quat_table[qx].dest,atoi(quat_table[qx].src1+1));
+        }
+        qx++;
+    }
+}
+void gen_asm_local_data(){
+    char* s="\tlocal\t@_tmp_var_%d\t\n";
+    int i;
+    int cur_num=-1;
+    gen_asm_data(0);
+    for(i=qx;quat_table[i].op!=op_efunc && quat_table[i].op!=op_emain;i++){
+        if(quat_table[i].dest[0]=='&'){
+            if(atoi(quat_table[i].dest+1)>cur_num){
+                fprintf(fasm,s,atoi(1+quat_table[i].dest));
+                cur_num=atoi(1+quat_table[i].dest);
+            }
+        }
+    }
+}
+void gen_instruction(struct quat_struct quat){
+    char dest[VAR_LEN];
+    char src1[VAR_LEN];
+    char src2[VAR_LEN];
+    char* fmt0="\t%s\n";
+    char* fmt1="\t%s\t%s\n";
+    char* fmt2="\t%s\t%s,%s\n";
+    reconvert_name(dest,quat.dest);
+    reconvert_name(src1,quat.src1);
+    reconvert_name(src2,quat.src2);
+    switch(quat.op){
+    case op_add:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"add","eax",src2);
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_sub:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"sub","eax",src2);
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_mul:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"imul","eax",src2);
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_idiv:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt0,"cdq");
+        fprintf(fasm,fmt1,"idiv",src2);
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_mov:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_push:
+        fprintf(fasm,fmt1,"push",dest);
+        break;
+    case op_pop:
+        fprintf(fasm,fmt1,"pop","eax");
+        break;
+    case op_call:
+        fprintf(fasm,fmt1,"call",dest);
+        break;
+    case op_arr_assign:
+        fprintf(fasm,"\t%s\t%s,[%s]\n","lea","eax",dest);
+        fprintf(fasm,fmt2,"mov","ebx",src1);
+        fprintf(fasm,fmt2,"mov","ecx",src2);
+        fprintf(fasm,"\t%s\t[%s+4*%s],%s\n","mov","eax","ebx","ecx");
+//        fprintf(fasm,fmt2,"mov","dest",src1);
+//        fprintf(fasm,fmt2,"imul","ebx","4");
+//        fprintf(fasm,"\t%s\tdword ptr [%s],%s","mov","eax",src2);
+        break;
+    case op_ret_void:
+        fprintf(fasm,fmt0,"leave");
+        fprintf(fasm,fmt0,"ret");
+        break;
+    case op_ret_value:
+        fprintf(fasm,fmt2,"mov","eax",dest);
+        fprintf(fasm,fmt0,"leave");
+        fprintf(fasm,fmt0,"ret");
+        break;
+    case op_beq:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"je",dest);
+        break;
+    case op_bne:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jne",dest);
+        break;
+    case op_ble:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jle",dest);
+        break;
+    case op_bls:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jl",dest);
+        break;
+    case op_bgt:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jg",dest);
+        break;
+    case op_bge:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jge",dest);
+        break;
+    case op_jump:
+        fprintf(fasm,fmt1,"jmp",dest);
+        break;
+    case op_prints:
+        if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","ADDR","_fmt_out_s",dest);
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_s",dest);
+        }
+        break;
+    case op_printi:
+        if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","ADDR","_fmt_out_i",dest);
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i",dest);
+        }
+        break;
+    case op_printc:
+        if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","ADDR","_fmt_out_c",dest);
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c",dest);
+        }
+        break;
+    case op_scanfc:
+        if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_scanf","ADDR","_fmt_in_c",dest);
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_scanf","OFFSET","_fmt_in_c",dest);
+        }
+        break;
+    case op_scanfi:
+        if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_scanf","ADDR","_fmt_in_i",dest);
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_scanf","OFFSET","_fmt_in_i",dest);
+        }
+        break;
+    case op_set_label:
+        fprintf(fasm,"%s:\n",dest);
+        break;
+    case op_load_ret:
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_arr_get:
+        fprintf(fasm,"\t%s\t%s,[%s]\n","lea","eax",src1);
+        fprintf(fasm,fmt2,"mov","ebx",src2);
+        fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov","eax","eax","ebx");
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+//        fprintf(fasm,fmt2,"imul","eax","4");
+//        fprintf(fasm,fmt2,"add","eax","ebx");
+//        fprintf(fasm,"\t%s\t%s,dword ptr [%s]","mov",dest,"eax");
+        break;
+    }
+}
+void gen_asm_code(){
+    fprintf(fasm,"%s",".code\n");
+    while(quat_table[qx].op==op_func||quat_table[qx].op==op_main){
+        if(quat_table[qx].op==op_main){
+            fprintf(fasm,"main PROC\n");
+            qx++;
+        }else{
+            fprintf(fasm,"_%s PROC\n",quat_table[qx].dest);
+            qx++;
+        }
+        gen_asm_local_data();
+        while(quat_table[qx].op!=op_efunc&&quat_table[qx].op!=op_emain){
+            gen_instruction(quat_table[qx]);
+            qx++;
+        }
+        if(quat_table[qx].op==op_emain){
+            fprintf(fasm,"\tinvoke ExitProcess,0\n");
+            fprintf(fasm,"main ENDP\n");
+            fprintf(fasm,"END main\n");
+            qx++;
+        }else{
+            fprintf(fasm,"_%s ENDP\n",quat_table[qx].dest);
+            qx++;
+        }
+        if(qx>=quat_index){
+            break;
+        }
+    }
+}
+
 ////符号表管理////
 int position(char tmp_token[],int *is_global){
     int i;
@@ -1001,7 +1238,6 @@ void funct_main_declaraction(int fsys[],int fsys_len){
         funct_tab[refer].last=last_local_ident_index-1;
         //enter_ident(token,is_global,func,notyp,refer,adr);
         needsym(rquote);
-        gen_quaternary(op_ret_void,"","","");
         gen_quaternary(op_emain,"","","");
     }else{
         error(43);//不管
@@ -1250,9 +1486,7 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
         getNextSym();
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
         selector(stop_set,stop_set_len,&seltype,selname);
-        gen_name(target_name);
         convert_name(basename,tmp_token,is_global);
-        gen_quaternary(op_arr,target_name,basename,selname);
     }
     if(sym!=becomes){
         error(12);
@@ -1266,8 +1500,10 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
             simpleexpression(fsys,fsys_len,&stype,sname);
             if(is_arr==0){
                 convert_name(target_name,tmp_token,is_global);
+                gen_quaternary(op_mov,target_name,sname,"");
+            }else{
+                gen_quaternary(op_arr_assign,basename,selname,sname);
             }
-            gen_quaternary(op_mov,target_name,sname,"");
             //插入运算指令
     //        if(ret_typ==ints && ident_tab[res_position].typ==ints){
     //        }else if(ret_typ==chars && ident_tab[res_position].typ==chars){
@@ -1387,6 +1623,7 @@ void scanf_statement(int fsys[],int fsys_len){
     int stop_set_len=2;
     int res_position;
     int is_global;
+    int ce_name[VAR_LEN];
     if(sym!=lparent){
         error(29);
     }else{
@@ -1409,17 +1646,18 @@ void scanf_statement(int fsys[],int fsys_len){
                 error(32);
                 test(stop_set,stop_set_len,fsys,fsys_len,-1);
             }else{
+                convert_name(ce_name,token,is_global);
                 if(is_global){
                     if(global_ident_tab[res_position].typ==ints){
-                        gen_quaternary(op_scanfi,token,"","");
+                        gen_quaternary(op_scanfi,ce_name,"","");
                     }else{
-                        gen_quaternary(op_scanfc,token,"","");
+                        gen_quaternary(op_scanfc,ce_name,"","");
                     }
                 }else{
                     if(local_ident_tab[res_position].typ==ints){
-                        gen_quaternary(op_scanfi,token,"","");
+                        gen_quaternary(op_scanfi,ce_name,"","");
                     }else{
-                        gen_quaternary(op_scanfc,token,"","");
+                        gen_quaternary(op_scanfc,ce_name,"","");
                     }
                 }
                 getNextSym();
@@ -1496,7 +1734,7 @@ int factor(int fsys[],int fsys_len,int *ftype,char fname[]){
                     selector(fsys,fsys_len,&seltype,selname);
                     gen_name(fname);
                     convert_name(basename,tmp_token,is_global);
-                    gen_quaternary(op_arr,fname,basename,selname);
+                    gen_quaternary(op_arr_get,fname,basename,selname);
                 }else if(sym==lparent){//函数调用
                     getNextSym();
                     funct_call(fsys,fsys_len,tmp_token,ftype);
@@ -1748,7 +1986,8 @@ int check_redeclaraction(int is_global,char ident_name[]){
 
 ////代码优化////
 
-////生成汇编////
+
+
 int main()
 {
     setInputOutput();
@@ -1791,6 +2030,8 @@ int main()
 //        }
     }
     outputquat();
+    gen_asm();
     finish_compile();
+    printf("12");
     return 0;
 }

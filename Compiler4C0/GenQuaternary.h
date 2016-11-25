@@ -7,19 +7,20 @@
 #define NAME_LEN 20
 #define SW 20
 #define MAX_PARA 20
-#define OP_LEN 31
+#define OP_LEN 32
 enum op_code{
     op_add=0,op_sub,op_mul,op_idiv,//3
     op_mov,//4
     op_push,op_pop,//6
-    op_call,op_arr,op_ret_void,op_ret_value,//10
+    op_call,op_arr_assign,op_ret_void,op_ret_value,//10
     op_beq,op_bne,op_ble,op_bls,op_bgt,op_bge,//16
     op_jump,//17
     op_prints,op_printi,op_printc,op_scanfc,op_scanfi,//22
     op_set_label,//23
     op_var_dcl,op_array_dcl,//25
     op_load_ret,//26
-    op_func,op_efunc,op_main,op_emain//30
+    op_func,op_efunc,op_main,op_emain,//30
+    op_arr_get
 };
 char* op_name[OP_LEN]={
     "add",
@@ -30,7 +31,7 @@ char* op_name[OP_LEN]={
     "push",
     "pop",
     "call",
-    "arr",
+    "arr_assign",
     "ret_void",
     "ret_value",
     "beq",
@@ -52,7 +53,8 @@ char* op_name[OP_LEN]={
     "func",
     "efunc",
     "main",
-    "emain"
+    "emain",
+    "arr_get"
 };
 struct quat_struct{
     enum op_code op;
@@ -72,4 +74,5 @@ void para_name(char dest[],int n);
 void gen_string_name(char name[]);
 int gen_quaternary(int op,char dest[],char src1[],char src2[]);
 int get_para_index(int pos);
+
 #endif // GENQUATERNARY_H_INCLUDED
