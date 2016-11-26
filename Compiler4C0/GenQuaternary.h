@@ -7,19 +7,19 @@
 #define NAME_LEN 20
 #define SW 20
 #define MAX_PARA 20
-#define OP_LEN 32
+#define OP_LEN 31
 enum op_code{
     op_add=0,op_sub,op_mul,op_idiv,//3
     op_mov,//4
-    op_push,op_pop,//6
-    op_call,op_arr_assign,op_ret_void,op_ret_value,//10
-    op_beq,op_bne,op_ble,op_bls,op_bgt,op_bge,//16
-    op_jump,//17
-    op_prints,op_printi,op_printc,op_scanfc,op_scanfi,//22
-    op_set_label,//23
-    op_var_dcl,op_array_dcl,//25
-    op_load_ret,//26
-    op_func,op_efunc,op_main,op_emain,//30
+    op_para,//5
+    op_call,op_arr_assign,op_ret_void,op_ret_value,//9
+    op_beq,op_bne,op_ble,op_bls,op_bgt,op_bge,//15
+    op_jump,//16
+    op_prints,op_printi,op_printc,op_scanfc,op_scanfi,//21
+    op_set_label,//22
+    op_var_dcl,op_array_dcl,//24
+    op_load_ret,//25
+    op_func,op_efunc,op_main,op_emain,//29
     op_arr_get
 };
 char* op_name[OP_LEN]={
@@ -28,8 +28,7 @@ char* op_name[OP_LEN]={
     "mul",
     "idiv",
     "mov",
-    "push",
-    "pop",
+    "para",
     "call",
     "arr_assign",
     "ret_void",
