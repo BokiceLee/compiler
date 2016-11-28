@@ -36,7 +36,8 @@ int read_ch_len=0;
 void setInputOutput(){
     set_in:
     printf("输入源代码文件的绝对路径，按回车结束\n");
-    scanf("%s",fsourcename);
+//    scanf("%s",fsourcename);
+    strcpy(fsourcename,"C://Users//24745//Desktop//13051259_test1.txt");
     fsource=fopen(fsourcename,"r");
     if(NULL==fsource){
         printf("no such file\n");
@@ -46,8 +47,9 @@ void setInputOutput(){
     //printf("input 0/1,0 for output result to console,1 for output result to file and you will have to input a file path\n");
     //scanf("%d",&output2where_console_0_file_1);
     if(1){//output2where_console_0_file_1){
-        printf("输入存储的四元式结果和汇编结果的目录的绝对路径，文件的名称默认为quat.txt和res.asm\n");
-        scanf("%s",ftarget_dir);
+        //printf("输入存储的四元式结果和汇编结果的目录的绝对路径，文件的名称默认为quat.txt和res.asm\n");
+        //scanf("%s",ftarget_dir);
+        strcpy(ftarget_dir,"C://Users//24745//Desktop//");
         strcpy(fquat_name,ftarget_dir);
         strcpy(fasm_name,ftarget_dir);
         strcat(fquat_name,"/quat.txt");
@@ -203,7 +205,7 @@ void gen_asm_head(){
     fprintf(fasm,"includelib C:\\masm32\\lib\\msvcrt.lib\n");
     fprintf(fasm,".data\n");
     for(i=0;i<=string_table_index;i++){
-        fprintf(fasm,"\t_STR_%03d\tDB\t'%s',0\n",i,string_tab[i]);
+        fprintf(fasm,"\t_STR_%03d\tDB\t\"%s\",0\n",i,string_tab[i]);
     }
     fprintf(fasm,"\t_fmt_out_s\tDB\t'%%s',0\n");
     fprintf(fasm,"\t_fmt_out_c\tDB\t'%%c',0\n");
@@ -265,7 +267,7 @@ void gen_instruction(struct quat_struct quat){
     case op_idiv:
         fprintf(fasm,fmt2,"mov","eax",src1);
         fprintf(fasm,fmt0,"cdq");
-        if(quat_table[qx].src2[0]=='$'){
+        if(quat_table[qx].src2[0]=='$'||quat_table[qx].src2[0]=='^'){
             fprintf(fasm,fmt1,"push","ebx");
             fprintf(fasm,fmt2,"mov","ebx",src2);
             fprintf(fasm,fmt1,"idiv","ebx");
@@ -276,7 +278,7 @@ void gen_instruction(struct quat_struct quat){
         fprintf(fasm,fmt2,"mov",dest,"eax");
         break;
     case op_mov:
-        if(quat_table[qx].src1[0]=='$'){
+        if(quat_table[qx].src1[0]=='$'&&quat_table[qx].dest[0]!='^'){
             fprintf(fasm,fmt2,"mov",dest,src1);
         }else{
             fprintf(fasm,fmt2,"mov","eax",src1);
@@ -293,9 +295,15 @@ void gen_instruction(struct quat_struct quat){
 //        fprintf(fasm,"\t%s\tdword ptr [%s],%s","mov","eax",src2);
         break;
     case op_ret_void:
+        fprintf(fasm,"\t%s\t%s\n","pop","esi");
+        fprintf(fasm,"\t%s\t%s\n","pop","edi");
+        fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
         fprintf(fasm,fmt0,"ret");
         break;
     case op_ret_value:
+        fprintf(fasm,"\t%s\t%s\n","pop","esi");
+        fprintf(fasm,"\t%s\t%s\n","pop","edi");
+        fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
         fprintf(fasm,fmt2,"mov","eax",dest);
         fprintf(fasm,fmt0,"ret");
         break;
@@ -340,10 +348,24 @@ void gen_instruction(struct quat_struct quat){
         }
         break;
     case op_printi:
-        fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i",dest);
+        if(quat_table[qx].dest[0]=='^'){
+            fprintf(fasm,fmt1,"push","eax");
+            fprintf(fasm,fmt2,"mov","eax",dest);
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i","eax");
+            fprintf(fasm,fmt1,"pop","eax");
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i",dest);
+        }
         break;
     case op_printc:
-        fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c",dest);
+        if(quat_table[qx].dest[0]=='^'){
+            fprintf(fasm,fmt1,"push","eax");
+            fprintf(fasm,fmt1,"mov","eax",dest);
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c","eax");
+            fprintf(fasm,fmt1,"pop","eax");
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c",dest);
+        }
         break;
     case op_scanfc:
         if(dest[0]=='@'){
@@ -423,9 +445,6 @@ void gen_asm_code(){
 //                fprintf(fasm,"\t%s\t%s\n","pop","eax");//调用者恢复现场
             }
         }
-        fprintf(fasm,"\t%s\t%s\n","pop","esi");
-        fprintf(fasm,"\t%s\t%s\n","pop","edi");
-        fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
         if(quat_table[qx].op==op_emain){
             fprintf(fasm,"\tinvoke ExitProcess,0\n");
             fprintf(fasm,"main ENDP\n");
@@ -973,7 +992,7 @@ void constdefinition(int fsys[],int fsys_len,int is_global){
                         test(stop_set,stop_set_len,fsys,fsys_len,-1);
                     }
                     if(sym==intcon && ident_typ==ints){
-                        enter_ident(is_global,tmp_token,con,ints,0,num_read);
+                        enter_ident(is_global,tmp_token,con,ints,0,positive*num_read);
                         getNextSym();
                     }else if(sym==charcon && ident_typ==chars){
                         value=token[0];
@@ -1541,7 +1560,11 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
                 error(11);
             }
             if(is_arr==0){
-                convert_name(target_name,tmp_token,is_global);
+                if(is_global==0&&local_ident_tab[res_position].obj==paras){
+                    para_name(target_name,local_ident_tab[res_position].adr);
+                }else{
+                    convert_name(target_name,tmp_token,is_global);
+                }
                 gen_quaternary(op_mov,target_name,sname,"");
             }else{
                 gen_quaternary(op_arr_assign,basename,selname,sname);
@@ -1872,9 +1895,6 @@ int simpleexpression(int fsys[],int fsys_len,int* const stype,char const sname[]
     int ttype2=-1;
     int* const p_ttype1=&ttype1;
     int* const p_ttype2=&ttype2;
-    if(row_in_source_file==12){
-        printf("Hello\n");
-    }
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==pluss||sym==minuss){
         positive=sym;
@@ -1892,9 +1912,6 @@ int simpleexpression(int fsys[],int fsys_len,int* const stype,char const sname[]
         }
         *stype=ints;
     }else{
-        if(row_in_source_file==21){
-           printf("hello\n");
-        }
         term(stop_set,stop_set_len,p_ttype2,tname2);
         *stype=ttype2;
     }
