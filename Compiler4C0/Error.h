@@ -1,6 +1,6 @@
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
-#define ERROR_NUM 46
+#define ERROR_NUM 48
 #define SET_LEN 20
 char errormsg[ERROR_NUM][40]={
         "数字以0开头"						  ,//0
@@ -14,7 +14,7 @@ char errormsg[ERROR_NUM][40]={
         "源程序不完整"                        ,//8
         "在char类型中变量为空"                ,//9
         "标识符非法"                          ,//10
-        "类型不匹配"                          ,//11
+        "表达式类型不匹配"                    ,//11
         "标识符或变量后应为="                 ,//12
         "int，char后应为标识符"               ,//13
         "Const后应为int或char"                ,//14
@@ -48,7 +48,9 @@ char errormsg[ERROR_NUM][40]={
         "default应为:"                        ,//42
         "未定义main函数"                      ,//43
         "main函数返回类型为void"              ,//44
-        "错误的结束字符"
+        "错误的结束字符"                      ,//45
+        "return语句与函数类型不匹配"          ,//46
+        "该标识符未定义或者不是函数"          //47
 };
 void error(int err_code);
 void fatal();
