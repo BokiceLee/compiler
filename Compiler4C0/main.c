@@ -855,6 +855,7 @@ void getNextSym(){
             }
             break;
         case '>':
+            getNextCh();
             if(ch=='='){
                 sym=geq;
                 getNextCh();
@@ -1457,13 +1458,15 @@ int condition(int fsys[],int fsys_len){
     int stop_set_len=6;
     char sname1[VAR_LEN],sname2[VAR_LEN];
     int stype1,stype2;
+    int* const p_stype1=&stype1;
+    int* const p_stype2=&stype2;
     int code_x;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    simpleexpression(stop_set,stop_set_len,&stype1,sname1);
+    simpleexpression(stop_set,stop_set_len,p_stype1,sname1);
     if(sym==eql||sym==neq||sym==gtr||sym==geq||sym==lss||sym==leq){
         tmp_sym=sym;
         getNextSym();
-        simpleexpression(fsys,fsys_len,&stype2,sname2);
+        simpleexpression(fsys,fsys_len,p_stype2,sname2);
         switch(tmp_sym){
         case eql://根据不同情况生成指令
             code_x=gen_quaternary(op_bne,"",sname1,sname2);
@@ -1497,9 +1500,11 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
     int is_global;
     int res_position=position(tmp_token,&is_global);
     int stype;
+    int* const p_stype=&stype;
     int target_type;
     char sname[VAR_LEN];
     int seltype;
+    int* const p_seltype=&seltype;
     char selname[VAR_LEN];
     char target_name[VAR_LEN];
     char basename[VAR_LEN];
@@ -1509,7 +1514,7 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
         is_arr=1;
         getNextSym();
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-        selector(stop_set,stop_set_len,&seltype,selname);
+        selector(stop_set,stop_set_len,p_seltype,selname);
         if(seltype==chars){
             error(11);
         }
@@ -1524,7 +1529,7 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
             test(fsys,fsys_len,NULL,0,-1);
         }else{
             getNextSym();
-            simpleexpression(fsys,fsys_len,&stype,sname);
+            simpleexpression(fsys,fsys_len,p_stype,sname);
             if(is_global){
                 target_type=global_ident_tab[res_position].typ;
             }else{
@@ -1559,13 +1564,14 @@ void switch_statement(int fsys[],int fsys_len){
     int stop_set2_len=1;
     char sname[VAR_LEN];
     int stype;
+    int* const p_stype=&stype;
     if(sym!=lparent){
         error(25);
     }else{
         getNextSym();
     }
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    simpleexpression(stop_set,stop_set_len,&stype,sname);
+    simpleexpression(stop_set,stop_set_len,p_stype,sname);
     needsym(rparent);
     if(sym!=lquote){
         error(24);
@@ -1573,11 +1579,11 @@ void switch_statement(int fsys[],int fsys_len){
         getNextSym();
     }
     stop_set2_len=merge_sym_set(stop_set2,stop_set2_len,fsys,fsys_len);
-    caselabel(stop_set2,stop_set2_len,&stype,sname);//onst?
+    caselabel(stop_set2,stop_set2_len,p_stype,sname);//onst?
     needsym(rquote);
     //printf("情况语句\n");
 }
-void caselabel(int fsys[],int fsys_len,int *stype,char sname[]){
+void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
     int stop_set[SET_LEN]={casesy,defaultsy};
     int stop_set_len=2;
     int con_name[VAR_LEN];
@@ -1711,6 +1717,7 @@ void printf_statement(int fsys[],int fsys_len){
     char string_name[VAR_LEN];
     char sname[VAR_LEN];
     int stype;
+    int* const p_stype=&stype;
     if(sym!=lparent){
         error(29);
     }else{
@@ -1723,7 +1730,7 @@ void printf_statement(int fsys[],int fsys_len){
         getNextSym();
         if(sym==comma){
             getNextSym();
-            simpleexpression(stop_set,stop_set_len,&stype,sname);
+            simpleexpression(stop_set,stop_set_len,p_stype,sname);
             if(stype==ints){
                 gen_quaternary(op_printi,sname,"","");
             }else{
@@ -1732,7 +1739,7 @@ void printf_statement(int fsys[],int fsys_len){
         }
         needsym(rparent);
     }else {
-        simpleexpression(stop_set,stop_set_len,&stype,sname);
+        simpleexpression(stop_set,stop_set_len,p_stype,sname);
         needsym(rparent);
         if(stype==ints){
             gen_quaternary(op_printi,sname,"","");
@@ -1742,7 +1749,7 @@ void printf_statement(int fsys[],int fsys_len){
     }
     //printf("写语句\n");
 }
-int factor(int fsys[],int fsys_len,int *ftype,char fname[]){
+int factor(int fsys[],int fsys_len,int* const ftype,char fname[]){
     int res_position;
     char tmp_token[LEN_OF_NAME];
     int legal_set[SET_LEN]={lparent,ident,intcon,charcon};
@@ -1751,6 +1758,7 @@ int factor(int fsys[],int fsys_len,int *ftype,char fname[]){
     int stop_set_len=1;
     int is_global;
     int seltype;
+    int* const p_seltype=&seltype;
     int selname[VAR_LEN];
     char basename[VAR_LEN];
     int para_n=0;
@@ -1768,7 +1776,7 @@ int factor(int fsys[],int fsys_len,int *ftype,char fname[]){
                 getNextSym();
                 if(sym==lbrack){//数组
                     getNextSym();
-                    selector(fsys,fsys_len,&seltype,selname);
+                    selector(fsys,fsys_len,p_seltype,selname);
                     gen_name(fname);
                     convert_name(basename,tmp_token,is_global);
                     gen_quaternary(op_arr_get,fname,basename,selname);
@@ -1820,14 +1828,17 @@ int factor(int fsys[],int fsys_len,int *ftype,char fname[]){
     //printf("因子\n");
     return 0;
 }
-int term(int fsys[],int fsys_len,int *ttype,char tname[]){
+int term(int fsys[],int fsys_len,int* const ttype,char tname[]){
     enum symbol fac_op;
     int stop_set[SET_LEN]={times,idiv};
     int stop_set_len=2;
     char fname1[VAR_LEN],fname2[VAR_LEN];
-    int ftype1,ftype2;
+    int ftype1=-1;
+    int ftype2=-1;
+    int* const p_ftype1=&ftype1;
+    int* const p_ftype2=&ftype2;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    factor(stop_set,stop_set_len,&ftype1,fname1);
+    factor(stop_set,stop_set_len,p_ftype1,fname1);
     *ttype=ftype1;
     while(times==sym||idiv==sym){
         if(*ttype==chars){
@@ -1835,7 +1846,7 @@ int term(int fsys[],int fsys_len,int *ttype,char tname[]){
         }
         fac_op=sym;
         getNextSym();
-        factor(stop_set,stop_set_len,&ftype2,fname2);
+        factor(stop_set,stop_set_len,p_ftype2,fname2);
         if(ftype2==chars){
             error(11);
         }
@@ -1852,17 +1863,23 @@ int term(int fsys[],int fsys_len,int *ttype,char tname[]){
     //printf("项\n");
     return 0;
 }
-int simpleexpression(int fsys[],int fsys_len,int *stype,char sname[]){
+int simpleexpression(int fsys[],int fsys_len,int* const stype,char const sname[]){
     enum symbol positive;
     int stop_set[SET_LEN]={pluss,minuss};
     int stop_set_len=2;
     char tname1[VAR_LEN],tname2[VAR_LEN];
-    int ttype1,ttype2;
+    int ttype1=-1;
+    int ttype2=-1;
+    int* const p_ttype1=&ttype1;
+    int* const p_ttype2=&ttype2;
+    if(row_in_source_file==12){
+        printf("Hello\n");
+    }
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==pluss||sym==minuss){
         positive=sym;
         getNextSym();
-        term(stop_set,stop_set_len,&ttype1,tname1);
+        term(stop_set,stop_set_len,p_ttype1,tname1);
         if(positive==minuss){
             //插入取反操作
             if(ttype1==chars){
@@ -1875,14 +1892,17 @@ int simpleexpression(int fsys[],int fsys_len,int *stype,char sname[]){
         }
         *stype=ints;
     }else{
-        term(stop_set,stop_set_len,&ttype2,tname2);
+        if(row_in_source_file==21){
+           printf("hello\n");
+        }
+        term(stop_set,stop_set_len,p_ttype2,tname2);
         *stype=ttype2;
     }
     while(sym==pluss||sym==minuss){
         gen_name(sname);
         positive=sym;
         getNextSym();
-        term(stop_set,stop_set_len,&ttype1,tname1);
+        term(stop_set,stop_set_len,p_ttype1,tname1);
         if(*stype!=ttype1){
             error(11);
         }
@@ -1904,6 +1924,7 @@ void return_statement(int fsys[],int fsys_len){
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
     int stype;
+    int* const p_stype=&stype;
     char sname[VAR_LEN];
     if(sym==semicolon){
         if(global_ident_tab[global_ident_index-1].typ!=notyp){
@@ -1919,7 +1940,7 @@ void return_statement(int fsys[],int fsys_len){
         getNextSym();
     }
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    simpleexpression(stop_set,stop_set_len,&stype,sname);
+    simpleexpression(stop_set,stop_set_len,p_stype,sname);
     if(global_ident_tab[global_ident_index-1].typ!=stype){
         error(46);
     }
@@ -1927,12 +1948,13 @@ void return_statement(int fsys[],int fsys_len){
     gen_quaternary(op_ret_value,sname,"","");
     //printf("返回语句\n");
 }
-void funct_call(int fsys[],int fsys_len,char funct_name[],int *funct_type){
+void funct_call(int fsys[],int fsys_len,char funct_name[],int* const funct_type){
     int stop_set[SET_LEN]={comma,rparent};
     int stop_set_len=2;
     int stop_set2[SET_LEN]={rparent};
     int stop_set2_len=1;
     int stype;
+    int* const p_stype=&stype;
     char sname[MAX_PARA][VAR_LEN];
     int i=global_ident_index-1;
     int ref;
@@ -1963,7 +1985,7 @@ void funct_call(int fsys[],int fsys_len,char funct_name[],int *funct_type){
     par_num=i;
     if(sym!=rparent && par_num>0){
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-        simpleexpression(stop_set,stop_set_len,&stype,sname[par_num-i]);
+        simpleexpression(stop_set,stop_set_len,p_stype,sname[par_num-i]);
         if(local_ident_tab[par_x[i-1]].typ!=stype){
             printf("类型不匹配");
         }
@@ -1974,7 +1996,7 @@ void funct_call(int fsys[],int fsys_len,char funct_name[],int *funct_type){
                     break;
                 }
                 getNextSym();
-                simpleexpression(stop_set,stop_set_len,&stype,sname[par_num-i]);
+                simpleexpression(stop_set,stop_set_len,p_stype,sname[par_num-i]);
                 i--;
             }while(sym==comma);
         }
@@ -2010,7 +2032,7 @@ void funct_call(int fsys[],int fsys_len,char funct_name[],int *funct_type){
     gen_quaternary(op_call,funct_name,"","");
     //printf("函数调用语句\n");
 }
-void selector(int fsys[],int fsys_len,int *seltype,char selname[]){
+void selector(int fsys[],int fsys_len,int* const seltype,char selname[]){
     int stop_set[SET_LEN]={rbrack};
     int stop_set_len=1;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
