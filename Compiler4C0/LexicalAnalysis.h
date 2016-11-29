@@ -66,6 +66,8 @@ int read_ch_len=0;
 int end_flag=0;
 int return_temp=0;
 
+extern void error(int err_code);
+
 void clearTmpToken(char tmp_token[]);
 void clearToken();
 int is_reversed(char s[]);
@@ -78,6 +80,7 @@ int is_right_char_in_string(char c);
 int is_digital(char c);
 void getNextCh();
 void getNextSym();
+
 void clearTmpToken(char tmp_Token[]){
     int i;
     for(i=0;i<LEN_OF_NAME;i++){

@@ -5,7 +5,7 @@
 #define VAR_LEN 20
 #define QUAT_TABLE_LEN 400
 #define NAME_LEN 20
-#define SW 20
+#define SW_BR_NUM 20
 #define MAX_PARA 20
 #define OP_LEN 31
 enum op_code{

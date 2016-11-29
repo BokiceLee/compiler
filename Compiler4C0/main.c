@@ -7,7 +7,6 @@
 #include "GenAsm.h"
 #include "LexicalAnalysis.h"
 #include "Optimization.h"
-#include "SemanticAnalysis.h"
 #include "SymbolManagement.h"
 #include "GenQuaternary.h"
 #include "GrammarAnalysis.h"

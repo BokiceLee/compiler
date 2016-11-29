@@ -60,7 +60,7 @@ void program(){
             test(stop_set,stop_set_len,NULL,0,31);
         }
     }
-    funct_main_declaraction(1,NULL);
+    funct_main_declaraction(NULL,0);
     //printf("程序\n");
     if(sym==-1){
         printf("程序正确结束\n");
@@ -142,7 +142,7 @@ void constdefinition(int fsys[],int fsys_len,int is_global){
                         value=token[0];
                         enter_ident(is_global,tmp_token,con,chars,0,value);
                         getNextSym();
-                    }else if(sym==chars && ident_typ==ints){
+                    }else if(sym==charcon && ident_typ==ints){
                         error(26);//不管
                         value=token[0];
                         enter_ident(is_global,tmp_token,con,ints,0,value);
@@ -165,7 +165,6 @@ void constdefinition(int fsys[],int fsys_len,int is_global){
     }while(sym==comma);
 }
 void vardeclaraction(int fsys[],int fsys_len,int is_global){
-    enum types ident_typs;
     int stop_set[SET_LEN]={semicolon,lparent};
     int stop_set_len=2;
     if(is_global){
@@ -174,11 +173,6 @@ void vardeclaraction(int fsys[],int fsys_len,int is_global){
         stop_set[stop_set_len++]=voidsy;
     }
     do{
-        if(sym==intsy){
-            ident_typs=ints;
-        }else{
-            ident_typs=chars;
-        }
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
         vardefinition(stop_set,stop_set_len,is_global);
         if(sym==lparent){
@@ -486,7 +480,6 @@ void compound_statement(int fsys[],int fsys_len){
    //printf("复合语句\n");
 }
 void statements(int fsys[],int fsys_len){
-    char tmp_token[LEN_OF_NAME];
     int stop_set[SET_LEN]={ident,ifsy,whilesy,lquote,scanfsy,printfsy,switchsy,returnsy,semicolon,rquote};
     int stop_set_len=10;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
@@ -886,6 +879,8 @@ int condition(int fsys[],int fsys_len){
         case leq:
             code_x=gen_quaternary(op_bgt,"",sname1,sname2);
             break;
+        default:
+            printf("error compare operation!\n");
         }
     }else{
         code_x=gen_quaternary(op_ble,"",sname1,"$0");
@@ -926,9 +921,9 @@ void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
     int stop_set_len=2;
     int con_name[VAR_LEN];
     int lab_finish;
-    int labx[SW];
+    int labx[SW_BR_NUM];
     int i=0;
-    int case_begin[SW],case_end[SW];
+    int case_begin[SW_BR_NUM],case_end[SW_BR_NUM];
     test(stop_set,stop_set_len,fsys,fsys_len,27);
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==casesy){
@@ -1050,7 +1045,6 @@ void scanf_statement(int fsys[],int fsys_len){
 //printf("读语句\n");
 }
 void printf_statement(int fsys[],int fsys_len){
-    int res_position;
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
     char string_name[VAR_LEN];

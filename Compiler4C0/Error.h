@@ -54,21 +54,19 @@ char errormsg[ERROR_NUM][40]={
         "该标识符未定义或者不是函数"          //47
 };
 
-//extern char token[LEN_OF_NAME];
-//extern int read_ch_len;
-//extern int row_in_source_file;
-//extern int column_in_source_file;
-//extern int num_read;
-//extern enum symbol sym;
-
 int errors=0;
+
 void error(int err_code);
 void fatal();
 int search_sym_in_set(int sym_set[],int set_len);
-int merge_sym_set(int s1[],int s1_len,int s2[],int s2_len);
 void skip(int sym_set[],int set_len,int err_code);
+int merge_sym_set(int s1[],int s1_len,int s2[],int s2_len);
 void test(int legal_set[],int legal_set_len,int stop_set[],int stop_set_len,int err_code);
-void testsemicolon();
+void needsym(int sym_need);
+
+void fatal(){
+    ;
+}
 void error(int err_code){
     switch(err_code){
     case -1:
@@ -150,8 +148,6 @@ void needsym(int sym_need){
         getNextSym();
     }
 }
-void fatal(){
-    ;
-}
+
 
 #endif // ERROR_H_INCLUDED
