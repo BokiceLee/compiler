@@ -37,9 +37,7 @@
 		<Unit filename="Global.h" />
 		<Unit filename="GrammarAnalysis.h" />
 		<Unit filename="LexicalAnalysis.h" />
-		<Unit filename="MyHead.h" />
 		<Unit filename="Optimization.h" />
-		<Unit filename="SemanticAnalysis.h" />
 		<Unit filename="SymbolManagement.h" />
 		<Unit filename="main.c">
 			<Option compilerVar="CC" />

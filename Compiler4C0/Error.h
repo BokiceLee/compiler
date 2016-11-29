@@ -96,6 +96,9 @@ void skip(int sym_set[],int set_len,int err_code){
     error(err_code);
     while(!search_sym_in_set(sym_set,set_len)){
         getNextSym();
+        if(sym==-1){
+            break;
+        }
     }
 }
 int merge_sym_set(int s1[],int s1_len,int s2[],int s2_len){

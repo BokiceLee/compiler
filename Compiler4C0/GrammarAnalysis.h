@@ -62,7 +62,7 @@ void program(){
     }
     funct_main_declaraction(NULL,0);
     //printf("程序\n");
-    if(sym==-1){
+    if(sym==-1 && errors==0){
         printf("程序正确结束\n");
     }else{
         printf("程序未正确结束");
@@ -391,11 +391,12 @@ void funct_ret_declaraction(int fsys[],int fsys_len){
     }else{
         if(sym==mainsy){
             error(44);
+            getNextSym();
         }else{
             error(13);
+            test(fsys,fsys_len,NULL,0,-1);
+            return;
         }
-        test(fsys,fsys_len,NULL,0,-1);
-        return;
     }
     if(sym!=lparent){
         error(22);
@@ -922,32 +923,46 @@ void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
     int con_name[VAR_LEN];
     int lab_finish;
     int labx[SW_BR_NUM];
+    int positive=1;
     int i=0;
     int case_begin[SW_BR_NUM],case_end[SW_BR_NUM];
+    int value=0;
     test(stop_set,stop_set_len,fsys,fsys_len,27);
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==casesy){
         do{
             getNextSym();
-            if(sym!=intcon&&sym!=charcon){
-                error(40);//重标签同处理
-                test(stop_set,2,fsys,fsys_len,-1);
-            }else{
-                //分号
-                if(sym==intcon){
-                    insert2name(con_name,num_read,ints);
-                }else{
-                    insert2name(con_name,token[0],chars);
+            if(sym!=charcon){
+                if(sym==pluss||sym==minuss){
+                    if(sym==minuss){
+                        positive=-1;
+                    }
+                    getNextSym();
                 }
-                labx[i]=gen_lab();
-                gen_quaternary(op_set_label,label_table[labx[i]],"","");
-                case_begin[i]=gen_quaternary(op_bne,"",sname,con_name);
-                getNextSym();
-                onecase(stop_set,stop_set_len);
-                case_end[i]=gen_quaternary(op_jump,"","","");
-                i++;
-                //打标签
+                if(sym==intcon){
+                    if(num_read==0){
+                        error(16);
+                    }
+                    value=positive*num_read;
+                }else{
+                    error(40);//重标签同处理
+                    test(stop_set,2,fsys,fsys_len,-1);
+                }
             }
+            //分号
+            if(sym==intcon){
+                insert2name(con_name,value,ints);
+            }else{
+                insert2name(con_name,token[0],chars);
+            }
+            labx[i]=gen_lab();
+            gen_quaternary(op_set_label,label_table[labx[i]],"","");
+            case_begin[i]=gen_quaternary(op_bne,"",sname,con_name);
+            getNextSym();
+            onecase(stop_set,stop_set_len);
+            case_end[i]=gen_quaternary(op_jump,"","","");
+            i++;
+            //打标签
         }while(sym==casesy);
     }else if(sym==defaultsy){
         error(27);
