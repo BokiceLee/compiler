@@ -1,3 +1,4 @@
+#include "LexicalAnalysis.h"
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
 #define ERROR_NUM 48
@@ -52,6 +53,15 @@ char errormsg[ERROR_NUM][40]={
         "return语句与函数类型不匹配"          ,//46
         "该标识符未定义或者不是函数"          //47
 };
+
+//extern char token[LEN_OF_NAME];
+//extern int read_ch_len;
+//extern int row_in_source_file;
+//extern int column_in_source_file;
+//extern int num_read;
+//extern enum symbol sym;
+
+int errors=0;
 void error(int err_code);
 void fatal();
 int search_sym_in_set(int sym_set[],int set_len);
@@ -59,4 +69,89 @@ int merge_sym_set(int s1[],int s1_len,int s2[],int s2_len);
 void skip(int sym_set[],int set_len,int err_code);
 void test(int legal_set[],int legal_set_len,int stop_set[],int stop_set_len,int err_code);
 void testsemicolon();
+void error(int err_code){
+    switch(err_code){
+    case -1:
+        return;
+    case 0:
+        token[--read_ch_len]='\0';
+        break;
+    case 2:
+        num_read=0;
+        break;
+    }
+    printf("error near row %d,column %d(maybe not right):\n",row_in_source_file,column_in_source_file);
+    printf("error:%d ~~~~~error message:%s\n",++errors,errormsg[err_code]);
+}
+int search_sym_in_set(int sym_set[],int set_len){
+    int i;
+    int flag=0;
+    for(i=0;i<set_len;i++){
+        if(sym_set[i]==sym){
+            flag=1;
+            break;
+        }
+    }
+    return flag;
+}
+void skip(int sym_set[],int set_len,int err_code){
+    error(err_code);
+    while(!search_sym_in_set(sym_set,set_len)){
+        getNextSym();
+    }
+}
+int merge_sym_set(int s1[],int s1_len,int s2[],int s2_len){
+    int i;
+    int j;
+    int res=s1_len;
+    if(s2_len==0){
+        return s1_len;
+    }
+    for(j=0;j<s2_len;j++){
+        for(i=0;i<s1_len;i++){
+            if(s1[i]==s2[j]){
+                break;
+            }
+        }
+        if(i>=s1_len){
+            s1[res++]=s2[j];
+        }
+    }
+    return res;
+}
+void test(int legal_set[],int legal_set_len,int stop_set[],int stop_set_len,int err_code){
+    int new_set[SET_LEN];
+    int new_set_len;
+    if(!search_sym_in_set(legal_set,legal_set_len)){
+        new_set_len=merge_sym_set(new_set,0,legal_set,legal_set_len);
+        new_set_len=merge_sym_set(new_set,new_set_len,stop_set,stop_set_len);
+        skip(new_set,new_set_len,err_code);
+    }
+}
+void needsym(int sym_need){
+    if(sym!=sym_need){
+        switch(sym_need){
+            case semicolon:
+                error(15);
+                break;
+            case rparent:
+                error(17);
+                break;
+            case rbrack:
+                error(18);
+                break;
+            case rquote:
+                error(19);
+                break;
+            default:
+                ;
+        }
+    }else{
+        getNextSym();
+    }
+}
+void fatal(){
+    ;
+}
+
 #endif // ERROR_H_INCLUDED
