@@ -574,6 +574,8 @@ int int_num(int fsys[],int fsys_len,char iname[]){
         insert2name(iname,positive*num_read,ints);
         getNextSym();
         return 1;
+    }else{
+        insert2name(iname,0,ints);
     }
     return 0;
 }
