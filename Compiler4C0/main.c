@@ -6,7 +6,7 @@
 #include "Error.h"
 #include "GenAsm.h"
 #include "LexicalAnalysis.h"
-#include "Optimization.h"
+//#include "Optimization.h"
 #include "SymbolManagement.h"
 #include "GenQuaternary.h"
 #include "GrammarAnalysis.h"

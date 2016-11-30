@@ -16,6 +16,7 @@ void compound_statement(int fsys[],int fsys_len);
 void statements(int fsys[],int fsys_len);
 void statement(int fsys[],int fsys_len);
 
+int int_num(int fsys[],int fsys_len,char iname[]);
 int factor(int fsys[],int fsys_len,int* const ftype,char fname[]);
 int term(int fsys[],int fsys_len,int* const ttype,char tname[]);
 int simpleexpression(int fsys[],int fsys_len,int* const stype,char sname[]);
@@ -556,22 +557,42 @@ void statement(int fsys[],int fsys_len){
 //printf("Óï¾ä\n");
 }
 
+int int_num(int fsys[],int fsys_len,char iname[]){
+    int positive=1;
+    int flag=0;
+    if(sym==pluss||sym==minuss){
+        if(sym==minuss){
+            positive=-1;
+        }
+        flag=1;
+        getNextSym();
+    }
+    if(sym==intcon){
+        if(num_read==0&&flag==1){
+            error(16);
+        }
+        insert2name(iname,positive*num_read,ints);
+        getNextSym();
+        return 1;
+    }
+    return 0;
+}
 int factor(int fsys[],int fsys_len,int* const ftype,char fname[]){
     int res_position;
     char tmp_token[LEN_OF_NAME];
-    int legal_set[SET_LEN]={lparent,ident,intcon,charcon};
-    int legal_set_len=4;
+    int legal_set[SET_LEN]={lparent,ident,intcon,charcon,pluss,minuss};
+    int legal_set_len=6;
     int stop_set[SET_LEN]={rparent};
     int stop_set_len=1;
     int is_global;
     int seltype;
     int* const p_seltype=&seltype;
-    int selname[VAR_LEN];
+    char selname[VAR_LEN];
     char basename[VAR_LEN];
     int para_n=0;
     //test
     test(legal_set,legal_set_len,fsys,fsys_len,31);
-    if(sym==ident||sym==intcon||sym==charcon){
+    if(sym==ident||sym==intcon||sym==charcon||sym==pluss||sym==minuss){
         if(sym==ident){
             strcpy(tmp_token,token);
             res_position=position(tmp_token,&is_global);
@@ -620,11 +641,11 @@ int factor(int fsys[],int fsys_len,int* const ftype,char fname[]){
             if(sym==charcon){
                 insert2name(fname,token[0],chars);
                 *ftype=chars;
+                getNextSym();
             }else{
-                insert2name(fname,num_read,ints);
+                int_num(fsys,fsys_len,fname);
                 *ftype=ints;
             }
-            getNextSym();
         }
     }else if(sym==lparent){
         getNextSym();
