@@ -3,7 +3,7 @@
 #define LABEL_LEN 20
 #define LABEL_TABLE_LEN 1000
 #define VAR_LEN 20
-#define QUAT_TABLE_LEN 400
+#define QUAT_TABLE_LEN 1000
 #define NAME_LEN 20
 #define SW_BR_NUM 20
 #define MAX_PARA 20
@@ -91,7 +91,7 @@ void convert_name(char dest[],char src[],int is_global){
     if(is_global){
         sprintf(dest,"%s",src);
     }else{
-        sprintf(dest,"@%s",src);
+        sprintf(dest,"@_%s",src);
     }
 }
 void para_name(char dest[],int n){

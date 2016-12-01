@@ -44,7 +44,7 @@ void gen_asm_head(){
     fprintf(fasm,"\t_fmt_out_c\tDB\t'%%c',0\n");
     fprintf(fasm,"\t_fmt_out_i\tDB\t'%%d',0\n");
     fprintf(fasm,"\t_fmt_in_c\tDB\t'%%c',0\n");
-    fprintf(fasm,"\t_fmt_in_i\tDB\t'%%d ',0\n");//读数字后面有空格隔开
+    fprintf(fasm,"\t_fmt_in_i\tDB\t'%%d',0\n");//读数字后面有空格隔开
 }
 void gen_asm_data(int is_global){
     char* s[]={"\tlocal\t%s\n","\t_%s\tDD\t0\n"};

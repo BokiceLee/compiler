@@ -610,6 +610,11 @@ int factor(int fsys[],int fsys_len,int* const ftype,char fname[]){
                     gen_name(fname);
                     convert_name(basename,tmp_token,is_global);
                     gen_quaternary(op_arr_get,fname,basename,selname);
+                    if(is_global){
+                        *ftype=global_ident_tab[res_position].typ;
+                    }else{
+                        *ftype=local_ident_tab[res_position].typ;
+                    }
                 }else if(sym==lparent){//º¯Êýµ÷ÓÃ
                     getNextSym();
                     funct_call(fsys,fsys_len,tmp_token,ftype);
