@@ -18,6 +18,7 @@ int main()
     printf("compile result:\n");
     getNextSym();
     program();
+    printf("³ÌĞò·ÖÎö½áÊø\n");
     outputquat();
     gen_asm();
     finish_compile();

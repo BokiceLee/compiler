@@ -1,9 +1,9 @@
 #include "LexicalAnalysis.h"
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
-#define ERROR_NUM 51
+#define ERROR_NUM 52
 #define SET_LEN 30
-char errormsg[ERROR_NUM][40]={
+char errormsg[ERROR_NUM][60]={
         "数字以0开头"						  ,//0
         "数字以字母结尾"                      ,//1
         "数字太大"                            ,//2
@@ -54,7 +54,8 @@ char errormsg[ERROR_NUM][40]={
         "该标识符未定义或者不是函数"          ,//47
         "scanf语句只能接受非数组变量"         ,//48
         "switch语句中的标签与表达式类型不匹配",//49
-        "switch语句中的标签重复"               //50
+        "switch语句中的标签重复"              ,//50
+        "程序不完整，可能未正确定义main函数，自动结束编译"   //51
 };
 
 int errors=0;
@@ -80,6 +81,10 @@ void error(int err_code){
     case 2:
         num_read=0;
         break;
+    case 51:
+        printf("error near row %d,column %d(maybe not right):\n",row_in_source_file,column_in_source_file);
+        printf("error:%d ~~~~~error message:%s\n",++errors,errormsg[err_code]);
+        exit(0);
     }
     printf("error near row %d,column %d(maybe not right):\n",row_in_source_file,column_in_source_file);
     printf("error:%d ~~~~~error message:%s\n",++errors,errormsg[err_code]);

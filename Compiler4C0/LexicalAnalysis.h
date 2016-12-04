@@ -179,7 +179,7 @@ void getNextCh(){
         column_in_source_file=0;
     }
     if((ch=fgetc(fsource))==EOF){
-        end_flag=1;
+        //end_flag=1;
         column_in_source_file++;
     }else if(ch=='\n'){
         return_temp=1;
@@ -363,6 +363,10 @@ void getNextSym(){
             break;
         case -1:
             sym=-1;
+            if(end_flag){
+                error(51);
+            }
+            end_flag=1;
             break;
         default:
             error(7);

@@ -66,7 +66,9 @@ void program(){
     if(sym==-1 && errors==0){
         printf("程序正确结束\n");
     }else{
-        printf("程序未正确结束");
+        if(sym!=-1){
+            printf("程序结束，main函数后有不合法成分\n");
+        }
     }
 }
 
@@ -484,8 +486,10 @@ void compound_statement(int fsys[],int fsys_len){
 void statements(int fsys[],int fsys_len){
     int stop_set[SET_LEN]={ident,ifsy,whilesy,lquote,scanfsy,printfsy,switchsy,returnsy,semicolon,rquote};
     int stop_set_len=10;
+    int stop_set2[SET_LEN]={voidsy,charsy,intsy};
+    int stop_set2_len=3;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-    while(sym!=rquote){
+    while(sym!=rquote&&!search_sym_in_set(stop_set2,stop_set2_len)){
         if(sym==semicolon){
             getNextSym();
         }
