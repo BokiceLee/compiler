@@ -21,7 +21,7 @@ void setInputOutput(){
     set_in:
     printf("输入源代码文件的绝对路径，按回车结束\n");
     //scanf("%s",fsourcename);
-    strcpy(fsourcename,"C://Users//24745//Desktop//14061110_test2.txt");
+    strcpy(fsourcename,"C://Users//24745//Desktop//14061110_test3.txt");
     fsource=fopen(fsourcename,"r");
     if(NULL==fsource){
         printf("no such file\n");

@@ -8,9 +8,9 @@ int qx=0;
 int tmp_var_flag[TMP_VAR_NUM];
 void gen_asm();
 void gen_asm_head();
-void gen_asm_data(int is_glocal);
-void gen_asm_local_data();
-void gen_instruction(struct quat_struct quat);
+int gen_asm_data(int is_glocal);
+int gen_asm_local_data();
+void gen_instruction(struct quat_struct quat,int var_flag,int is_main);
 void gen_asm_code();
 void reconvert_name(char res[],char src[]);
 
@@ -38,7 +38,11 @@ void gen_asm_head(){
     fprintf(fasm,"includelib C:\\masm32\\lib\\msvcrt.lib\n");
     fprintf(fasm,".data\n");
     for(i=0;i<=string_table_index;i++){
-        fprintf(fasm,"\t_STR_%03d\tDB\t\"%s\",0\n",i,string_tab[i]);
+        if(string_tab[i][0]=='\0'){
+            fprintf(fasm,"\t_STR_%03d\tBYTE\t0\n",i);
+        }else{
+            fprintf(fasm,"\t_STR_%03d\tDB\t\"%s\",0\n",i,string_tab[i]);
+        }
     }
     fprintf(fasm,"\t_fmt_out_s\tDB\t'%%s',0\n");
     fprintf(fasm,"\t_fmt_out_c\tDB\t'%%c',0\n");
@@ -46,32 +50,39 @@ void gen_asm_head(){
     fprintf(fasm,"\t_fmt_in_c\tDB\t'%%c',0\n");
     fprintf(fasm,"\t_fmt_in_i\tDB\t'%%d',0\n");//读数字后面有空格隔开
 }
-void gen_asm_data(int is_global){
+int gen_asm_data(int is_global){
     char* s[]={"\tlocal\t%s\n","\t_%s\tDD\t0\n"};
     char* dup_s[]={"\tlocal\t%s[%d]\n","\t_%s\tDD\t%d\tDUP(0)\n"};
+    int lc_data_num=0;
     while(quat_table[qx].op==op_var_dcl||quat_table[qx].op==op_array_dcl){
         if(quat_table[qx].op==op_var_dcl){
             fprintf(fasm,s[is_global],quat_table[qx].dest);
+            lc_data_num++;
         }else{
             fprintf(fasm,dup_s[is_global],quat_table[qx].dest,atoi(quat_table[qx].src1+1));
+            lc_data_num++;
         }
         qx++;
     }
+    return lc_data_num;
 }
-void gen_asm_local_data(){
+int gen_asm_local_data(){
     char* s="\tlocal\t@_tmp_var_%03d\t\n";
     int i;
-    gen_asm_data(0);
+    int lc_data_num;
+    lc_data_num=gen_asm_data(0);
     for(i=qx;quat_table[i].op!=op_efunc && quat_table[i].op!=op_emain;i++){
         if(quat_table[i].dest[0]=='&'){
             if(tmp_var_flag[atoi(quat_table[i].dest+1)]==0){
                 fprintf(fasm,s,atoi(1+quat_table[i].dest));
                 tmp_var_flag[atoi(quat_table[i].dest+1)]=1;
+                lc_data_num++;
             }
         }
     }
+    return lc_data_num;
 }
-void gen_instruction(struct quat_struct quat){
+void gen_instruction(struct quat_struct quat,int var_flag,int is_main){
     char dest[VAR_LEN];
     char src1[VAR_LEN];
     char src2[VAR_LEN];
@@ -131,13 +142,25 @@ void gen_instruction(struct quat_struct quat){
         fprintf(fasm,"\t%s\t%s\n","pop","esi");
         fprintf(fasm,"\t%s\t%s\n","pop","edi");
         fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
-        fprintf(fasm,fmt0,"ret");
+        if(var_flag==0){
+            fprintf(fasm,"\t%s\t%s,%s\n","mov","esp","ebp");
+            fprintf(fasm,"\t%s\t%s\n","pop","ebp");
+        }
+        if(is_main){
+            fprintf(fasm,"\tinvoke ExitProcess,0\n");
+        }else{
+            fprintf(fasm,fmt0,"ret");
+        }
         break;
     case op_ret_value:
         fprintf(fasm,"\t%s\t%s\n","pop","esi");
         fprintf(fasm,"\t%s\t%s\n","pop","edi");
         fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
         fprintf(fasm,fmt2,"mov","eax",dest);
+        if(var_flag==0){
+            fprintf(fasm,"\t%s\t%s,%s\n","mov","esp","ebp");
+            fprintf(fasm,"\t%s\t%s\n","pop","ebp");
+        }
         fprintf(fasm,fmt0,"ret");
         break;
     case op_beq:
@@ -193,7 +216,7 @@ void gen_instruction(struct quat_struct quat){
     case op_printc:
         if(quat_table[qx].dest[0]=='^'){
             fprintf(fasm,fmt1,"push","eax");
-            fprintf(fasm,fmt1,"mov","eax",dest);
+            fprintf(fasm,fmt2,"mov","eax",dest);
             fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c","eax");
             fprintf(fasm,fmt1,"pop","eax");
         }else{
@@ -236,23 +259,33 @@ void gen_instruction(struct quat_struct quat){
 void gen_asm_code(){
     int para_count=0;
     char ce_name[VAR_LEN];
+    int var_flag=0;
+    int is_main;
     fprintf(fasm,"%s",".code\n");
     while(quat_table[qx].op==op_func||quat_table[qx].op==op_main){
         if(quat_table[qx].op==op_main){
             fprintf(fasm,"main PROC\n");
             qx++;
+            is_main=1;
         }else{
             reconvert_name(ce_name,quat_table[qx].dest);
             fprintf(fasm,"%s PROC\n",ce_name);
             qx++;
+            is_main=0;
         }
-        gen_asm_local_data();
+        if(gen_asm_local_data()>0){
+            var_flag=1;
+        }else{
+            fprintf(fasm,"\t%s\t%s\n","push","ebp");
+            fprintf(fasm,"\t%s\t%s,%s\n","mov","ebp","esp");
+            var_flag=0;
+        }
         fprintf(fasm,"\t%s\t%s\n","push","ebx");
         fprintf(fasm,"\t%s\t%s\n","push","edi");
         fprintf(fasm,"\t%s\t%s\n","push","esi");//被调用者保护现场
         while(quat_table[qx].op!=op_efunc&&quat_table[qx].op!=op_emain){
             if(quat_table[qx].op!=op_para && quat_table[qx].op!=op_call){
-                gen_instruction(quat_table[qx]);
+                gen_instruction(quat_table[qx],var_flag,is_main);
                 qx++;
             }else{
 //                fprintf(fasm,"\t%s\t%s\n","push","eax");
@@ -279,7 +312,6 @@ void gen_asm_code(){
             }
         }
         if(quat_table[qx].op==op_emain){
-            fprintf(fasm,"\tinvoke ExitProcess,0\n");
             fprintf(fasm,"main ENDP\n");
             fprintf(fasm,"END main\n");
             qx++;

@@ -456,12 +456,13 @@ void funct_main_declaraction(int fsys[],int fsys_len){
             getNextSym();
         }
         refer=enter_funct(0,-1,0,0);
-        merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
-        compound_statement(stop_set,stop_set_len);
         enter_ident(1,"main",func,notyp,refer,adr);
+        stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
+        compound_statement(stop_set,stop_set_len);
         funct_tab[refer].last=last_local_ident_index-1;
         //enter_ident(token,is_global,func,notyp,refer,adr);
         needsym(rquote);
+        gen_quaternary(op_ret_void,"","","");
         gen_quaternary(op_emain,"","","");
     }else{
         error(43);//²»¹Ü
@@ -471,14 +472,14 @@ void funct_main_declaraction(int fsys[],int fsys_len){
 
 
 void compound_statement(int fsys[],int fsys_len){
-    int stop_set[SET_LEN]={intsy,charsy,ident};
-    int stop_set_len=3;
+    int stop_set[SET_LEN]={ident,ifsy,whilesy,lquote,scanfsy,printfsy,switchsy,returnsy,semicolon,intsy,charsy};
+    int stop_set_len=11;
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==constsy){
         constdeclaraction(stop_set,stop_set_len,0);
     }
     if(sym==intsy||sym==charsy){
-        vardeclaraction(fsys,fsys_len,0);
+        vardeclaraction(stop_set,stop_set_len-2,0);
     }
     statements(fsys,fsys_len);
    //printf("¸´ºÏÓï¾ä\n");
@@ -962,20 +963,23 @@ void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
     int case_l[SW_BR_NUM];
     int l_x=0;
     int check_x=0;
+    int sign_flag;
     test(stop_set,stop_set_len,fsys,fsys_len,27);
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==casesy){
         do{
             getNextSym();
             if(sym!=charcon){
+                sign_flag=0;
                 if(sym==pluss||sym==minuss){
                     if(sym==minuss){
                         positive=-1;
                     }
+                    sign_flag=1;
                     getNextSym();
                 }
                 if(sym==intcon){
-                    if(num_read==0){
+                    if(num_read==0&&sign_flag==1){
                         error(16);
                     }
                     value=positive*num_read;
@@ -989,7 +993,7 @@ void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
                 if(*stype!=ints){
                     error(49);
                 }
-                for(check_x=l_x;check_x>=0;check_x--){
+                for(check_x=l_x-1;check_x>=0;check_x--){
                     if(case_l[check_x]==value){
                         break;
                     }
@@ -1003,7 +1007,7 @@ void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
                 if(*stype!=chars){
                     error(49);
                 }
-                for(check_x=l_x;check_x>=0;check_x--){
+                for(check_x=l_x-1;check_x>=0;check_x--){
                     if(case_l[check_x]==token[0]){
                         break;
                     }
