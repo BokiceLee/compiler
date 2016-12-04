@@ -789,6 +789,15 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
             error(32);
             test(fsys,fsys_len,NULL,0,-1);
         }else{
+            if(is_global){
+                if(global_ident_tab[res_position].obj==con||global_ident_tab[res_position].obj==func){
+                    error(53);
+                }
+            }else{
+                if(local_ident_tab[res_position].obj==con){
+                    error(53);
+                }
+            }
             getNextSym();
             simpleexpression(fsys,fsys_len,p_stype,sname);
             if(is_global){
@@ -970,6 +979,7 @@ void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
         do{
             getNextSym();
             if(sym!=charcon){
+                positive=1;
                 sign_flag=0;
                 if(sym==pluss||sym==minuss){
                     if(sym==minuss){

@@ -98,6 +98,8 @@ int is_reversed(char s[]){
     int right=REVERSED_NUM-1;
     int mid;
     int compare_res;
+    char tmp_s[LEN_OF_NAME];
+    strcpy(tmp_s,s);
     strlwr(s);
     do{
         mid=(left+right)/2;
@@ -107,6 +109,9 @@ int is_reversed(char s[]){
             right=mid-1;
             break;
         case 0:
+            if(strcmp(tmp_s,s)!=0){
+                error(52);
+            }
             return mid;
         case 1:
             left=mid+1;

@@ -1,7 +1,7 @@
 #include "LexicalAnalysis.h"
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
-#define ERROR_NUM 52
+#define ERROR_NUM 54
 #define SET_LEN 30
 char errormsg[ERROR_NUM][60]={
         "数字以0开头"						  ,//0
@@ -55,7 +55,9 @@ char errormsg[ERROR_NUM][60]={
         "scanf语句只能接受非数组变量"         ,//48
         "switch语句中的标签与表达式类型不匹配",//49
         "switch语句中的标签重复"              ,//50
-        "程序不完整，可能未正确定义main函数，自动结束编译"   //51
+        "程序不完整，可能未正确定义main函数，自动结束编译"   ,//51
+        "标识符与保留字冲突或者保留字大小写出错"   ,//52
+        "为函数或常量赋值"                     //53
 };
 
 int errors=0;
