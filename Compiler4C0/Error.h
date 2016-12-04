@@ -1,7 +1,7 @@
 #include "LexicalAnalysis.h"
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
-#define ERROR_NUM 48
+#define ERROR_NUM 51
 #define SET_LEN 30
 char errormsg[ERROR_NUM][40]={
         "数字以0开头"						  ,//0
@@ -51,7 +51,10 @@ char errormsg[ERROR_NUM][40]={
         "main函数返回类型为void"              ,//44
         "错误的结束字符"                      ,//45
         "return语句与函数类型不匹配"          ,//46
-        "该标识符未定义或者不是函数"          //47
+        "该标识符未定义或者不是函数"          ,//47
+        "scanf语句只能接受非数组变量"         ,//48
+        "switch语句中的标签与表达式类型不匹配",//49
+        "switch语句中的标签重复"               //50
 };
 
 int errors=0;

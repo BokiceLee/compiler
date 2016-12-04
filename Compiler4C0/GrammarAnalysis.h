@@ -955,6 +955,9 @@ void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
     int i=0;
     int case_begin[SW_BR_NUM],case_end[SW_BR_NUM];
     int value=0;
+    int case_l[SW_BR_NUM];
+    int l_x=0;
+    int check_x=0;
     test(stop_set,stop_set_len,fsys,fsys_len,27);
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     if(sym==casesy){
@@ -979,9 +982,34 @@ void caselabel(int fsys[],int fsys_len,int* const stype,char sname[]){
             }
             //·ÖºÅ
             if(sym==intcon){
+                if(*stype!=ints){
+                    error(49);
+                }
+                for(check_x=l_x;check_x>=0;check_x--){
+                    if(case_l[check_x]==value){
+                        break;
+                    }
+                }
+                if(check_x>=0){
+                    error(50);
+                }
+                case_l[l_x++]=value;
                 insert2name(con_name,value,ints);
             }else{
+                if(*stype!=chars){
+                    error(49);
+                }
+                for(check_x=l_x;check_x>=0;check_x--){
+                    if(case_l[check_x]==token[0]){
+                        break;
+                    }
+                }
+                if(check_x>=0){
+                    error(50);
+                }
+                case_l[l_x++]=token[0];
                 insert2name(con_name,token[0],chars);
+                //²é
             }
             labx[i]=gen_lab();
             gen_quaternary(op_set_label,label_table[labx[i]],"","");
@@ -1044,6 +1072,7 @@ void scanf_statement(int fsys[],int fsys_len){
     int res_position;
     int is_global;
     int ce_name[VAR_LEN];
+    int illegal_ident;
     if(sym!=lparent){
         error(29);
     }else{
@@ -1051,7 +1080,7 @@ void scanf_statement(int fsys[],int fsys_len){
     }
     if(sym!=ident){
         error(30);
-        test(stop_set,stop_set_len,fsys,fsys_len,-1);
+        test(stop_set,stop_set_len,NULL,0,-1);
     }
     do{
         if(sym==comma){
@@ -1059,28 +1088,43 @@ void scanf_statement(int fsys[],int fsys_len){
         }
         if(sym!=ident){
             error(30);
-            test(stop_set,stop_set_len,fsys,fsys_len,-1);
+            test(stop_set,stop_set_len,NULL,0,-1);
         }else{
             res_position=position(token,&is_global);
             if(res_position==-1){
                 error(32);
-                test(stop_set,stop_set_len,fsys,fsys_len,-1);
+                test(stop_set,stop_set_len,NULL,0,-1);
             }else{
-                convert_name(ce_name,token,is_global);
+                illegal_ident=0;
                 if(is_global){
-                    if(global_ident_tab[res_position].typ==ints){
-                        gen_quaternary(op_scanfi,ce_name,"","");
-                    }else{
-                        gen_quaternary(op_scanfc,ce_name,"","");
+                    if(global_ident_tab[res_position].obj!=var){
+                        illegal_ident=1;
                     }
                 }else{
-                    if(local_ident_tab[res_position].typ==ints){
-                        gen_quaternary(op_scanfi,ce_name,"","");
-                    }else{
-                        gen_quaternary(op_scanfc,ce_name,"","");
+                    if(local_ident_tab[res_position].obj!=var){
+                        illegal_ident=1;
                     }
                 }
-                getNextSym();
+                if(illegal_ident){
+                    error(48);
+                    test(stop_set,stop_set_len,NULL,0,-1);
+                }else{
+                    convert_name(ce_name,token,is_global);
+                    if(is_global){
+                        if(global_ident_tab[res_position].typ==ints){
+                            gen_quaternary(op_scanfi,ce_name,"","");
+                        }else{
+                            gen_quaternary(op_scanfc,ce_name,"","");
+                        }
+                    }else{
+                        if(local_ident_tab[res_position].typ==ints){
+                            gen_quaternary(op_scanfi,ce_name,"","");
+                        }else{
+                            gen_quaternary(op_scanfc,ce_name,"","");
+                        }
+                    }
+                    getNextSym();
+                }
             }
         }
     }while(sym==comma);
