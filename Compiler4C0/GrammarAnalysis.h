@@ -580,6 +580,7 @@ int int_num(int fsys[],int fsys_len,char iname[]){
         getNextSym();
         return 1;
     }else{
+        error(39);
         insert2name(iname,0,ints);
     }
     return 0;
