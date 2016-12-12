@@ -115,6 +115,7 @@ void constdefinition(int fsys[],int fsys_len,int is_global){
             redcl_flag=check_redeclaraction(is_global,token);
             if(redcl_flag){
                 error(36);//跳到下一个comma
+                getNextSym();
                 test(stop_set,stop_set_len,fsys,fsys_len,-1);
             }else{
                 strcpy(tmp_token,token);
@@ -210,6 +211,7 @@ void vardefinition(int fsys[],int fsys_len,int is_global){
             redcl_flag=check_redeclaraction(is_global,token);
             if(redcl_flag){
                 error(36);
+                getNextSym();
                 test(stop_set,stop_set_len,fsys,fsys_len,-1);
             }else{
                 strcpy(tmp_token,token);
