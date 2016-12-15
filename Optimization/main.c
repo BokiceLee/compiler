@@ -121,11 +121,8 @@ struct dag_map_struct{
 struct dag_table_struct{
     char name[VAR_LEN];
     int node_id[N_NUM];
-    struct quat_struct* quats[N_NUM];
     int id_num;
     int has_init;
-    int replacable;
-    char replace_name[VAR_LEN];
 };
 struct funct_struct funct_stru[F_NUM];
 struct quat_struct *seq_begin,*seq_end;
@@ -140,6 +137,7 @@ int dag_map_x=-1;
 int export_x=0;
 int current_funct;
 struct quat_struct *export_head,*export_tail;
+int rep_name_x=0;
 
 int get_op(char op_n[]){
     int i;
@@ -397,7 +395,6 @@ int get_child_id(char var_name[]){
         dag_table[dag_table_x].node_id[0]=dag_map_x;
         strcpy(dag_table[dag_table_x].name,var_name);
         dag_table[dag_table_x].has_init=1;
-        dag_table[dag_table_x].replacable=0;
     }
     return dag_map_x;
 }
@@ -434,7 +431,6 @@ void update_dag_table(struct quat_struct* quat,int dest_id,char dest_name[]){
     for(i=dag_table_x;i>=0;i--){
         if(strcmp(dest_name,dag_table[i].name)==0){
             dag_table[i].node_id[dag_table[i].id_num]=dest_id;
-            dag_table[i].quats[dag_table[i].id_num]=quat;
             dag_table[i].id_num++;
             return;
         }
@@ -444,8 +440,6 @@ void update_dag_table(struct quat_struct* quat,int dest_id,char dest_name[]){
         strcpy(dag_table[dag_table_x].name,dest_name);
         dag_table[dag_table_x].id_num=1;
         dag_table[dag_table_x].node_id[0]=dest_id;
-        dag_table[dag_table_x].quats[0]=quat;
-        dag_table[dag_table_x].replacable=0;
         dag_table[dag_table_x].has_init=0;
     }
 
@@ -455,7 +449,12 @@ void build_dag(int con_num){
     struct quat_struct* p;
     int dest_id,src1_id,src2_id;
     p=seq_begin;
+    dag_map_x=-1;
+    dag_table_x=-1;
     for(i=0;i<con_num;i++){
+        if(p->quat_id==180){
+            printf("180");
+        }
         if(p->op==op_mov){
             src1_id=get_child_id(p->src1);
             dag_map[src1_id].is_assigned=1;
@@ -467,6 +466,7 @@ void build_dag(int con_num){
             dag_map[dag_map_x].node_id=dag_map_x;
             dag_map[dag_map_x].lchild_id=src1_id;
             dag_map[dag_map_x].rchild_id=-1;
+            father_num[dag_map_x]=0;
             father_num[src1_id]++;
         }else{
             src1_id=get_child_id(p->src1);
@@ -502,17 +502,26 @@ int is_used_later(char var_name[]){
     struct quat_struct* p;
     p=seq_end->next;
     while(p!=funct_stru[current_funct].funct_end){
-        if(strcmp(var_name,p->src1)==1){
+        if(strcmp(var_name,p->src1)==0){
             return 1;
         }
-        if(strcmp(var_name,p->src2)==1){
+        if(strcmp(var_name,p->src2)==0){
             return 1;
         }
-        if(strcmp(var_name,p->dest)==1){
+        if(strcmp(var_name,p->dest)==0){
             return 1;
         }
+        p=p->next;
     }
     return 0;
+}
+void set_node_name(int node_id,char init_name[]){
+    if(strcmp(init_name,"")==0){
+        sprintf(node_name[node_id],"&r%03d",rep_name_x);
+        rep_name_x++;
+    }else{
+        sprintf(node_name[node_id],"%s",init_name);
+    }
 }
 void re_gen_quat(int op,char dest[],char src1[],char src2[]){
     struct quat_struct* p;
@@ -543,169 +552,82 @@ void finish_export(){
         p=p->next;
         free(tmp);
     }
-    export_tail->next=p->next;
-    free(p);
-}
-void replace_child(char replaced[],char toreplace[]){
-    int i;
-    if(toreplace[0]!='&'){//非临时变量不用替换
-        strcpy(replaced,toreplace);
-        return;
+    if(export_head==export_tail){
+        seq_begin->next=seq_end->next;
     }else{
-        for(i=0;i<=dag_table_x;i++){
-            if(0==strcmp(toreplace,dag_table[i].name)){
-                if(dag_table[i].replacable==1){
-                    strcpy(replaced,dag_table[i].replace_name);
-                    return;
-                }
-            }
-        }
+        export_tail->next=seq_end->next;
     }
 }
-void export_leaf_node(int node_id){
+int get_var_on_node(int var_on_node_x[],int node_id){
     int i,j;
-    int n_has_init_var[dag_table_x];
-    int n_x=0;
-    char init_name[VAR_LEN];
-    if(dag_map[node_id].is_assigned==1){//如果该叶子节点被赋值过
+    int v_num=0;
+    if(dag_map[node_id].op==op_leaf){
+        if(dag_map[node_id].is_assigned==0){
             for(i=0;i<=dag_table_x;i++){
-                for(j=0;j<dag_table[i].id_num;j++){
+                for(j=0;j<dag_table[i].id_num;i++){
                     if(dag_table[i].node_id[j]==node_id){
-                        if(dag_table[i].has_init==1){//找到初值叶节点
-                            strcpy(init_name,dag_table[i].name);
-                            //strcpy(node_name[node_id],dag_table[i].name);
-                        }else{
-                            n_has_init_var[n_x++]=i;//非初值叶节点
-                        }
+                        set_node_name(node_id,dag_table[i].name);
+                        return 0;
                     }
                 }
             }
-            for(i=0;i<n_x;i++){//非初值叶节点的值都等于初值叶节点
-                re_gen_quat(op_mov,dag_table[n_has_init_var[i]].name,init_name,"");
-            }//不会出现临时变量等于一个值情况？
-    }
-//    }else{//叶节点未被赋值
-//        for(i=0;i<=dag_table_x;i++){
-//            for(j=0;j<dag_table[i].id_num;i++){
-//                if(dag_table[i].node_id[j]==node_id){//将node_id与变量名对应
-//                    strcpy(node_name[node_id],dag_table[i].name);
-//                }
-//            }
-//        }
-//    }
-}
-
-void export_midside_node(int node_id){
-    int i,j,m,k,t;
-    int has_expli_expo=0;
-    char first_expo_name[VAR_LEN];
-    char rep_src1[VAR_LEN];
-    char rep_src2[VAR_LEN];
-    int n_tmp_var[N_NUM];
-    int n_exported_tmp_var[N_NUM];
-    int n_t_x=0;
-    int n_exported_t_x=0;
-    int expli_export_tmp_id=-1;
-    int replacable,has_next_node,next_node_id;
-    for(i=0;i<=dag_table_x;i++){
-        for(j=0;j<dag_table[i].id_num;j++){
-            if(dag_table[i].node_id[j]==node_id){
-                if(dag_table[i].name[0]!='&'){//非临时变量全部显示导出
-                    n_tmp_var[n_t_x++]=i;
-                    if(has_expli_expo==0){
-                        strcpy(first_expo_name,dag_table[i].name);
-                        has_expli_expo=1;//第一个导出的变量
-                        //替换
-                        replace_child(rep_src1,dag_table[i].quats[j]->src1);
-                        replace_child(rep_src2,dag_table[i].quats[j]->src2);//临时变量不会被修改，因此只需要考虑一个就可以
-                        re_gen_quat(dag_table[i].quats[j]->op,dag_table[i].name,rep_src1,rep_src2);
-                    }else{//剩下的变量导出为赋值语句
-                        re_gen_quat(op_mov,dag_table[i].name,first_expo_name,"");
-                    }
-                }else if(is_used_later(dag_table[i].name)==1){
-                    expli_export_tmp_id=i;//由于后继使用而显式导出的临时变量
-                    if(has_expli_expo==0){
-                        strcpy(first_expo_name,dag_table[i].name);
-                        has_expli_expo=1;//第一个导出的变量
-                        replace_child(rep_src1,dag_table[i].quats[j]->src1);
-                        replace_child(rep_src2,dag_table[i].quats[j]->src2);
-                        re_gen_quat(dag_table[i].quats[j]->op,dag_table[i].name,rep_src1,rep_src2);
-                    }else{//剩下的变量导出为赋值语句
-                        re_gen_quat(op_mov,dag_table[i].name,first_expo_name,"");
-                    }
+        }else{//找到初值叶节点
+            for(i=0;i<=dag_table_x;i++){
+                if(dag_table[i].name[0]!='&'){
+                    ;
+                }else if(is_used_later(dag_table[i].name)){
+                    ;
                 }else{
-                    n_exported_tmp_var[n_exported_t_x++]=i;
-                }
-            }
-        }
-    }
-    if(expli_export_tmp_id!=-1){//有显式导出的临时变量，则同id的临时变量都可以替换成该变量
-        for(i=0;i<n_exported_t_x;i++){
-            dag_table[i].replacable=1;
-            strcpy(dag_table[n_exported_tmp_var[i]].replace_name,dag_table[expli_export_tmp_id].name);
-        }
-    }else{//否则，判断是否可替换
-        for(i=0;i<n_exported_t_x;i++){//每个临时变量
-            replacable=1;
-            for(j=0;j<n_t_x;i++){//每个同id非临时变量
-                has_next_node=0;
-                for(t=0;t<dag_table[j].id_num-1;t++){//的下一个编号
-                    if(dag_table[j].node_id[t]==node_id){
-                        has_next_node=1;
-                        break;
-                    }
-                }
-                if(has_next_node==0){
                     continue;
                 }
-                next_node_id=dag_table[j].node_id[t+1];//下一个编号
-                for(k=0;k<=dag_table_x;k++){//遍历所有变量
-                    for(m=0;m<dag_table[k].id_num;m++){//的所有编号
-                        if(dag_table[k].node_id[m]> next_node_id){
-                            if(strcmp(dag_table[k].quats[m]->src1,dag_table[n_exported_tmp_var[i]].name)==0){
-                                replacable=0;
-                            }else if(strcmp(dag_table[k].quats[m]->src2,dag_table[n_exported_tmp_var[i]].name)==0){
-                                replacable=0;
-                            }
+                for(j=0;j<dag_table[i].id_num;i++){
+                    if(dag_table[i].node_id[j]==node_id){
+                        if(dag_table[i].has_init==1){
+                            set_node_name(node_id,dag_table[i].name);
+                        }else{
+                            var_on_node_x[v_num++]=i;
                         }
                     }
                 }
-                if(replacable==1){
-                    dag_table[n_exported_tmp_var[i]].replacable=1;
-                    strcpy(dag_table[n_exported_tmp_var[i]].replace_name,dag_table[n_tmp_var[j]].name);
-                    break;
-                }
             }
-            if(replacable==0){
-                if(has_expli_expo==0){
-                    strcpy(first_expo_name,dag_table[i].name);
-                    has_expli_expo=1;//第一个导出的变量
-                    replace_child(rep_src1,dag_table[i].quats[j]->src1);
-                    replace_child(rep_src2,dag_table[i].quats[j]->src2);
-                    re_gen_quat(dag_table[i].quats[j]->op,dag_table[i].name,rep_src1,rep_src2);
-                }else{//剩下的变量导出为赋值语句
-                    re_gen_quat(op_mov,dag_table[i].name,first_expo_name,"");
+            return v_num;
+        }
+    }else{
+        for(i=0;i<=dag_table_x;i++){
+            if(dag_table[i].name[0]!='&'){
+                ;
+            }else if(is_used_later(dag_table[i].name)){
+                ;
+            }else{
+                continue;
+            }
+            for(j=0;j<dag_table[i].id_num;j++){
+                if(dag_table[i].node_id[j]==node_id){
+                    var_on_node_x[v_num++]=i;
                 }
             }
         }
+        if(v_num==1){
+            set_node_name(node_id,dag_table[var_on_node_x[0]].name);
+            v_num=0;
+        }else{
+            set_node_name(node_id,"");
+        }
+        re_gen_quat(dag_map[node_id].op,node_name[node_id],node_name[dag_map[node_id].lchild_id],node_name[dag_map[node_id].rchild_id]);
+        return v_num;
     }
 }
 void export_node(int node_id){
     int i;
-    char printed_name[VAR_LEN];
-    if(dag_map[node_id].op==op_printc || dag_map[node_id].op==op_printc || dag_map[node_id].op==op_printc){
-        for(i=0;i<=dag_table_x;i++){//print也要插入到dag_table中
-            if(dag_table[i].node_id[0]==node_id){
-                replace_child(printed_name,dag_table[i].name);
-                re_gen_quat(dag_map[node_id].op,printed_name,"","");
-                break;
-            }
-
+    int var_on_node_x[dag_table_x];
+    int var_num=0;
+    if(dag_map[node_id].op==op_printc || dag_map[node_id].op==op_printi || dag_map[node_id].op==op_prints){
+        re_gen_quat(dag_map[node_id].op,node_name[dag_map[node_id].lchild_id],"","");
+    }else{
+        var_num=get_var_on_node(var_on_node_x,node_id);//同时设置node_name
+        for(i=0;i<var_num;i++){
+            re_gen_quat(op_mov,dag_table[var_on_node_x[i]].name,node_name[node_id],"");
         }
-    }else if(dag_map[node_id].op!=op_leaf){//非叶节点
-        export_midside_node(node_id);
-    }else{//叶节点
-        export_leaf_node(node_id);
     }
 }
 void export_dag(){
@@ -715,15 +637,18 @@ void export_dag(){
     int export_x=0;
     for(i=0;i<node_num;i++){
         father_in[i]=father_num[i];
+        strcpy(node_name[i],"");
     }
+    rep_name_x=0;
+
     while((export_id=get_max_node())>=0){
         export_queue[export_x++]=export_id;
         if(dag_map[export_id].op==op_leaf){
             continue;
         }
         while(1){
-            if(is_exportable(dag_map[export_id].rchild_id)){
-                export_id=dag_map[export_id].rchild_id;
+            if(is_exportable(dag_map[export_id].lchild_id)){
+                export_id=dag_map[export_id].lchild_id;
                 export_queue[export_x++]=export_id;
                 father_in[export_id]=-1;
                 if(dag_map[export_id].op==op_leaf){
@@ -746,11 +671,13 @@ void export_dag(){
     for(i=export_x-1;i>=0;i--){
         export_node(export_queue[i]);
     }
+    for(i=0;i<=dag_map_x;i++){
+        printf("%d %s\n",i,node_name[i]);
+    }
     finish_export();
 }
 void exec_dag(int funct_num){
     int i,j,k;
-//    struct quat_struct *seq_begin,*seq_end;
     struct quat_struct *find_begin,*find_end;
     struct quat_struct *p,*p_end;
     int con_num;
@@ -769,14 +696,17 @@ void exec_dag(int funct_num){
                 printf("\n");
                 p_end=seq_end->next;
                 if(con_num>1){
+                    if(j==16){
+                        printf("16\n");
+                    }
                     build_dag(con_num);
                     export_dag();
-                }
-                p=seq_begin;
-                printf("\n");
-                while(p!=p_end){
-                    printf("%s %s %s %s\n",op_name[p->op],p->dest,p->src1,p->src2);
-                    p=p->next;
+                    p=seq_begin;
+                    printf("\n");
+                    while(p!=p_end){
+                        printf("%s %s %s %s\n",op_name[p->op],p->dest,p->src1,p->src2);
+                        p=p->next;
+                    }
                 }
                 if(con_num==0){
                     find_begin=find_end->next;
