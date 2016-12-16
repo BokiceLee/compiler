@@ -101,7 +101,6 @@ struct quat_struct* convert_quat_table(struct src_quat src[],int src_len){
 }
 struct block_struct{
     struct quat_struct* block_begin;
-    struct quat_struct* block_end;
     struct block_struct* suffix[2];
     int suffix_num;
 };
@@ -125,7 +124,7 @@ struct dag_table_struct{
     int has_init;
 };
 struct funct_struct funct_stru[F_NUM];
-struct quat_struct *seq_begin,*seq_end;
+struct quat_struct *seq_begin,*after_seq;
 struct dag_map_struct dag_map[DAG_NUM];
 struct dag_table_struct dag_table[DAG_NUM];
 int father_num[DAG_NUM];
@@ -136,6 +135,7 @@ int dag_table_x=-1;
 int dag_map_x=-1;
 int export_x=0;
 int current_funct;
+int current_block;
 struct quat_struct *export_head,*export_tail;
 int rep_name_x=0;
 
@@ -272,7 +272,7 @@ int jumpbefore(int funcx,char label[]){
     struct quat_struct* p;
     for(i=0;i<funct_stru[funcx].block_num;i++){
         p=funct_stru[funcx].blocks[i].block_begin;
-        while(p!=funct_stru[funcx].blocks[i].block_end){
+        while(p!=NULL){
             if(p->op>=op_beq&&p->op<=op_jump){
                 if(strcmp(p->dest,label)==0){
                     return 1;
@@ -280,17 +280,13 @@ int jumpbefore(int funcx,char label[]){
             }
             p=p->next;
         }
-        if(p->op>=op_beq&&p->op<=op_jump){
-            if(strcmp(p->dest,label)==0){
-                return 1;
-            }
-        }
     }
     return 0;
 }
 void divide_blocks(struct quat_struct* head,struct src_quat src[],int funct_num){
     int i,valid,canjump;
-    struct quat_struct *p;
+    struct quat_struct* p;
+    struct quat_struct* p_next;
     int funcx=0;
     p=head;
     while(p!=NULL){
@@ -308,29 +304,37 @@ void divide_blocks(struct quat_struct* head,struct src_quat src[],int funct_num)
                         }
                     }
                     if(valid==0){
-                        p=get_quat_p(entryment[funcx][i+1]-1,p);
+                        p=get_quat_p(entryment[funcx][i+1],p);
                         continue;
                     }
                 }
                 p=get_quat_p(entryment[funcx][i],p);
                 funct_stru[funcx].blocks[funct_stru[funcx].block_num].block_begin=p;
                 p=get_quat_p(entryment[funcx][i+1]-1,p);
-                funct_stru[funcx].blocks[funct_stru[funcx].block_num].block_end=p;
+
                 if(p->op==op_ret_value||p->op==op_ret_void){
                     valid=0;//ret语句后的语句无效
                 }//暂时不确定基本块之间的关系，因为基本块未确定
                 funct_stru[funcx].block_num++;
+
+                p_next=p->next;
+                p->next=NULL;//基本块的最后一个语句指向空
+                p=p_next;
             }
-            p=p->next;
-            if(p->op==op_efunc||p->op==op_emain){
-                funct_stru[funcx].funct_end=p;//函数结束语句
-                p=p->next;
+            if(p->op==op_efunc||p->op==op_emain){//最后一个基本块为函数结束语句
+                funct_stru[funcx].blocks[funct_stru[funcx].block_num].block_begin=p;
+                funct_stru[funcx].block_num++;
                 funcx++;
+
+                p_next=p->next;
+                p->next=NULL;
+                p=p_next;
             }else{
-                printf("error:326,最后一个入口语句应是efunc or emain");
+                printf("error:326,最后一个入口语句应是efunc or emain\n");
             }
         }else{
             p=p->next;
+            printf("error:338,函数定义之间有不可识别语句\n");
         }
     }
 }
@@ -351,24 +355,25 @@ int is_available_op(int op){
             return 0;
     }
 }
-int find_continues_exp(struct quat_struct* find_begin,struct quat_struct* find_end){
-    struct quat_struct* p;
+int find_continues_exp(struct quat_struct* find_begin){
+    struct quat_struct *p,*p_last;
     int con_num=0;
-    p=find_begin;
-    while(p->quat_id<=find_end->quat_id){
+    seq_begin=NULL;
+    after_seq=NULL;//置空
+    for(p=find_begin;p!=NULL;p=p->next){//查找第一个运算式
         if(is_available_op(p->op)==1){
             seq_begin=p;
             break;
-        }else{
-            p=p->next;
         }
     }
-    while(p->quat_id<=find_end->quat_id){
+    while(p!=NULL){//查找所有运算式
         if(is_available_op(p->op)==1){
-            seq_end=p;
+            p_last=p;
             p=p->next;
             con_num++;
         }else{
+            p_last->next=NULL;//最后一个运算式的下一个语句置空
+            after_seq=p;//运算式之后的第一个语句
             break;
         }
     }
@@ -452,9 +457,6 @@ void build_dag(int con_num){
     dag_map_x=-1;
     dag_table_x=-1;
     for(i=0;i<con_num;i++){
-        if(p->quat_id==180){
-            printf("180");
-        }
         if(p->op==op_mov){
             src1_id=get_child_id(p->src1);
             dag_map[src1_id].is_assigned=1;
@@ -500,8 +502,9 @@ int get_max_node(){
 }
 int is_used_later(char var_name[]){
     struct quat_struct* p;
-    p=seq_end->next;
-    while(p!=funct_stru[current_funct].funct_end){
+    int i;
+    p=after_seq;
+    while(p!=NULL){
         if(strcmp(var_name,p->src1)==0){
             return 1;
         }
@@ -512,6 +515,21 @@ int is_used_later(char var_name[]){
             return 1;
         }
         p=p->next;
+    }
+    for(i=current_block+1;i<funct_stru[current_funct].block_num;i++){
+        p=funct_stru[current_funct].blocks[i].block_begin;
+        while(p!=NULL){
+            if(strcmp(var_name,p->src1)==0){
+                return 1;
+            }
+            if(strcmp(var_name,p->src2)==0){
+                return 1;
+            }
+            if(strcmp(var_name,p->dest)==0){
+                return 1;
+            }
+            p=p->next;
+        }
     }
     return 0;
 }
@@ -547,15 +565,15 @@ void finish_export(){
     strcpy(seq_begin->src1,export_head->src1);
     strcpy(seq_begin->src2,export_head->src2);
     seq_begin->next=export_head->next;
-    while(p!=seq_end){
+    while(p!=NULL){
         tmp=p;
         p=p->next;
         free(tmp);
     }
     if(export_head==export_tail){
-        seq_begin->next=seq_end->next;
+        seq_begin->next=after_seq;
     }else{
-        export_tail->next=seq_end->next;
+        export_tail->next=after_seq;
     }
 }
 int get_var_on_node(int var_on_node_x[],int node_id){
@@ -573,18 +591,18 @@ int get_var_on_node(int var_on_node_x[],int node_id){
             }
         }else{//找到初值叶节点
             for(i=0;i<=dag_table_x;i++){
-                if(dag_table[i].name[0]!='&'){
-                    ;
-                }else if(is_used_later(dag_table[i].name)){
-                    ;
-                }else{
-                    continue;
-                }
-                for(j=0;j<dag_table[i].id_num;i++){
+                for(j=0;j<dag_table[i].id_num;j++){
                     if(dag_table[i].node_id[j]==node_id){
                         if(dag_table[i].has_init==1){
                             set_node_name(node_id,dag_table[i].name);
                         }else{
+                            if(dag_table[i].name[0]!='&'){
+                                ;
+                            }else if(is_used_later(dag_table[i].name)){
+                                ;
+                            }else{
+                                continue;
+                            }
                             var_on_node_x[v_num++]=i;
                         }
                     }
@@ -639,8 +657,6 @@ void export_dag(){
         father_in[i]=father_num[i];
         strcpy(node_name[i],"");
     }
-    rep_name_x=0;
-
     while((export_id=get_max_node())>=0){
         export_queue[export_x++]=export_id;
         if(dag_map[export_id].op==op_leaf){
@@ -671,55 +687,49 @@ void export_dag(){
     for(i=export_x-1;i>=0;i--){
         export_node(export_queue[i]);
     }
-    for(i=0;i<=dag_map_x;i++){
-        printf("%d %s\n",i,node_name[i]);
-    }
+//    for(i=0;i<=dag_map_x;i++){
+//        printf("%d %s\n",i,node_name[i]);
+//    }
     finish_export();
 }
 void exec_dag(int funct_num){
     int i,j,k;
-    struct quat_struct *find_begin,*find_end;
-    struct quat_struct *p,*p_end;
+    struct quat_struct *find_begin;
+    struct quat_struct *p;
     int con_num;
     for(i=0;i<funct_num;i++){
         current_funct=i;
         for(j=0;j<funct_stru[i].block_num;j++){
+            current_block=j;
             find_begin=funct_stru[i].blocks[j].block_begin;
-            find_end=funct_stru[i].blocks[j].block_end;
-            while(find_begin->quat_id<=find_end->quat_id){//判断是否已经查过头了，find_end或者find_end后
-                con_num=find_continues_exp(find_begin,find_end);
+            while(find_begin!=NULL){//遍历该基本块
+                con_num=find_continues_exp(find_begin);
                 p=seq_begin;
                 for(k=0;k<con_num;k++){
-                    printf("%d %s %s %s %s\n",p->quat_id,op_name[p->op],p->dest,p->src1,p->src2);
+                    //printf("%d %s %s %s %s\n",p->quat_id,op_name[p->op],p->dest,p->src1,p->src2);
                     p=p->next;
                 }
-                printf("\n");
-                p_end=seq_end->next;
-                if(con_num>1){
-                    if(j==16){
-                        printf("16\n");
-                    }
+                //printf("\n");
+                if(con_num>=1){
                     build_dag(con_num);
                     export_dag();
-                    p=seq_begin;
-                    printf("\n");
-                    while(p!=p_end){
-                        printf("%s %s %s %s\n",op_name[p->op],p->dest,p->src1,p->src2);
-                        p=p->next;
+                    for(p=seq_begin;p!=after_seq;p=p->next){
+                        ;//printf("%s %s %s %s\n",op_name[p->op],p->dest,p->src1,p->src2);
                     }
                 }
-                if(con_num==0){
-                    find_begin=find_end->next;
+                if(con_num==0){//未找到连续运算，进行下一个基本块
+                    break;
                 }else{
-                    find_begin=p_end;
+                    find_begin=after_seq;
                 }
             }
         }
     }
 }
+
 int main()
 {
-    struct quat_struct *head,*p;
+    struct quat_struct *head,*code,*p,*data;
     struct src_quat src[600];
     int i,j;
     int quat_num;
@@ -735,21 +745,43 @@ int main()
         entry_num[i]=sort_entryment(entryment[i],entry_num[i]);
     }
     //入口语句信息开始转化为链表存储
-    divide_blocks(head,src,funct_num);
-    exec_dag(funct_num);
-    for(i=0;i<0;i++){
-        printf("\nfunct %d----------------\n",i);
-        for(j=0;j<funct_stru[i].block_num;j++){
-            printf("block %d------\n",j);
-            p=funct_stru[i].blocks[j].block_begin;
-            while(p!=funct_stru[i].blocks[j].block_end){
-                printf("%d %s %s %s %s\n",p->quat_id,op_name[p->op],p->dest,p->src1,p->src2);
-                p=p->next;
-            }
-            printf("%d %s %s %s %s\n",p->quat_id,op_name[p->op],p->dest,p->src1,p->src2);
+    p=head;
+    if(p->op!=op_func&&p->op!=op_main){//将data和code分离
+        data=p;
+        while(p->next->op!=op_func && p->next->op!=op_main){
+            p=p->next;
         }
-        p=funct_stru[i].funct_end;
-        printf("%d %s %s %s %s\n",p->quat_id,op_name[p->op],p->dest,p->src1,p->src2);
+        code=p->next;
+        p->next=NULL;
+    }else{
+        data=NULL;
+        code=p;
+    }
+    divide_blocks(code,src,funct_num);
+    exec_dag(funct_num);
+    quat_num=0;
+    for(p=data;p!=NULL;p=p->next){
+        src[quat_num].op=p->op;
+        strcpy(src[quat_num].dest,p->dest);
+        strcpy(src[quat_num].src1,p->src1);
+        strcpy(src[quat_num].src2,p->src2);
+        quat_num++;
+    }
+    for(i=0;i<funct_num;i++){
+        for(j=0;j<funct_stru[i].block_num;j++){
+            p=funct_stru[i].blocks[j].block_begin;
+            while(p!=NULL){
+                src[quat_num].op=p->op;
+                strcpy(src[quat_num].dest,p->dest);
+                strcpy(src[quat_num].src1,p->src1);
+                strcpy(src[quat_num].src2,p->src2);
+                p=p->next;
+                quat_num++;
+            }
+        }
+    }
+    for(i=0;i<quat_num;i++){
+        printf("%d %s %s %s %s\n",i,op_name[src[i].op],src[i].dest,src[i].src1,src[i].src2);
     }
     return 0;
 }
