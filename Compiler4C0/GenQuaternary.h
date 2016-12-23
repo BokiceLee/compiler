@@ -20,7 +20,8 @@ enum op_code{
     op_var_dcl,op_array_dcl,//24
     op_load_ret,//25
     op_func,op_efunc,op_main,op_emain,//29
-    op_arr_get
+    op_arr_get,//30
+    op_leaf//31 Ò¶½Úµã
 };
 char* op_name[OP_LEN]={
     "add",

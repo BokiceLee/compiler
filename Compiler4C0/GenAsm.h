@@ -3,6 +3,8 @@
 #define GENASM_H_INCLUDED
 #define INSTRU_LEN 40
 #define TMP_VAR_NUM 1000
+#define R_TMP_VAR_NUM 1000
+#define LOCAL_REG_NUM 3
 
 int qx=0;
 int tmp_var_flag[TMP_VAR_NUM];
@@ -351,5 +353,275 @@ void reconvert_name(char res[],char src[]){
         return;
     }
 }
-//void gen_instruction(struct quat_struct quat);
+
+
+struct local_reg_var_struct{
+    enum regs reg;
+    char var_name[VAR_LEN];
+};
+struct local_reg_var_struct local_reg_var[LOCAL_REG_NUM];
+enum regs reg_pool[LOCAL_REG_NUM]={edx,ecx,eax};
+int reg_pool_x=3;
+int reg_var_x=0;
+int r_tmp_var_flag[R_TMP_VAR_NUM];
+//申请临时寄存器
+int sendback_reg(char dest[],char other1[],char other2[]){//返回置空表项
+    int i;
+    for(i=0;i<LOCAL_REG_NUM;i++){
+        if(strcmp(dest,local_reg_var[i].var_name)!=0&&strcmp(other1,local_reg_var[i].var_name)!=0&&strcmp(other2,local_reg_var[i].var_name)!=0){
+            reg_pool[reg_pool_x++]=local_reg_var[i].reg;
+            return i;
+        }
+    }
+}
+int apply_reg(char dest[],char other1[],char other2[]){
+    int i;
+    if(reg_pool_x==0){
+        reg_var_x=sendback_reg(dest,other1,other2);
+    }
+    local_reg_var[reg_var_x].reg=reg_pool[--reg_pool_x];
+    strcpy(dest,local_reg_var[reg_var_x].var_name);
+}
+
+void opt_gen_asm(){
+    int i=0;
+    fasm=fopen(fasm_name,"w");
+    opt_gen_asm_head();
+    for(i=0;i<TMP_VAR_NUM;i++){
+        tmp_var_flag[i]=0;
+    }
+    for(i=0;i<R_TMP_VAR_NUM;i++){
+        r_tmp_var_flag[i]=0;
+    }
+    opt_gen_asm_data(1);
+    opt_gen_asm_code();
+}
+void opt_gen_asm_head(){
+    gen_asm_head();
+}
+int opt_gen_asm_data(int is_global,struct opt_quat_struct* p){
+    char* s[]={"\tlocal\t%s\n","\t_%s\tDD\t0\n"};
+    char* dup_s[]={"\tlocal\t%s[%d]\n","\t_%s\tDD\t%d\tDUP(0)\n"};
+    int lc_data_num=0;
+    while(1){
+        if(p==NULL||(p->op!=op_var_dcl&&p->op!=op_array_dcl)){
+           break;
+        }
+        if(quat_table[qx].op==op_var_dcl){
+            fprintf(fasm,s[is_global],p->dest);
+            lc_data_num++;
+        }else{
+            fprintf(fasm,dup_s[is_global],p->dest,atoi(p->src1+1));
+            lc_data_num++;
+        }
+        p=p->next;
+    }
+    return lc_data_num;
+}
+int opt_gen_asm_local_data(int funcx){
+    char* s="\tlocal\t@_tmp_var_%03d\t\n";
+    char* r_s="\tlocal\t@r_tmp_var_%03d\t\n"
+    int i;
+    int lc_data_num;
+    struct opt_quat_struct* p;
+    lc_data_num=opt_gen_asm_data(0,p);
+    for(i=0;i<functs[funcx].block_num;i++){//如果已分配全局变量，则不需要分配
+        p=functs[funcx].blocks[i];
+        if(p->dest[0]=='&'){
+            if(p->dest[1]=='r'){
+                if(r_tmp_var_flag[atoi(p->dest+2)]==0){
+                    fprintf(fasm,r_s,atoi(p->dest+2));
+                    r_tmp_var_flag[atoi(p->dest+2)]=1;
+                    lc_data_num++;
+                }
+            }else{
+                if(tmp_var_flag[atoi(quat_table[i].dest+1)]==0){
+                    fprintf(fasm,s,atoi(1+quat_table[i].dest));
+                    tmp_var_flag[atoi(quat_table[i].dest+1)]=1;
+                    lc_data_num++;
+                }
+            }
+        }
+    }
+    return lc_data_num;
+}
+void opt_gen_instruction(struct opt_quat_struct* p){
+    char dest[VAR_LEN];
+    char src1[VAR_LEN];
+    char src2[VAR_LEN];
+    char* fmt0="\t%s\n";
+    char* fmt1="\t%s\t%s\n";
+    char* fmt2="\t%s\t%s,%s\n";
+    opt_reconvert_name(dest,quat.dest);
+    opt_reconvert_name(src1,quat.src1);
+    opt_reconvert_name(src2,quat.src2);
+    switch(p->op){
+    case op_add:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"add","eax",src2);
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_sub:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"sub","eax",src2);
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_mul:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"imul","eax",src2);
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_idiv:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt0,"cdq");
+        if(p->src2[0]=='$'||p->src2[0]=='^'){
+            fprintf(fasm,fmt1,"push","ebx");
+            fprintf(fasm,fmt2,"mov","ebx",src2);
+            fprintf(fasm,fmt1,"idiv","ebx");
+            fprintf(fasm,fmt1,"pop","ebx");
+        }else{
+            fprintf(fasm,fmt1,"idiv",src2);
+        }
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_mov:
+        if(quat_table[qx].src1[0]=='$'&&quat_table[qx].dest[0]!='^'){
+            fprintf(fasm,fmt2,"mov",dest,src1);
+        }else{
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"mov",dest,"eax");
+        }
+        break;
+    case op_arr_assign:
+        fprintf(fasm,"\t%s\t%s,[%s]\n","lea","eax",dest);
+        fprintf(fasm,fmt2,"mov","ebx",src1);
+        fprintf(fasm,fmt2,"mov","ecx",src2);
+        fprintf(fasm,"\t%s\t[%s+4*%s],%s\n","mov","eax","ebx","ecx");
+//        fprintf(fasm,fmt2,"mov","dest",src1);
+//        fprintf(fasm,fmt2,"imul","ebx","4");
+//        fprintf(fasm,"\t%s\tdword ptr [%s],%s","mov","eax",src2);
+        break;
+    case op_ret_void:
+        fprintf(fasm,"\t%s\t%s\n","pop","esi");
+        fprintf(fasm,"\t%s\t%s\n","pop","edi");
+        fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
+        if(var_flag==0){
+            fprintf(fasm,"\t%s\t%s,%s\n","mov","esp","ebp");
+            fprintf(fasm,"\t%s\t%s\n","pop","ebp");
+        }
+        if(is_main){
+            fprintf(fasm,"\tinvoke ExitProcess,0\n");
+        }else{
+            fprintf(fasm,fmt0,"ret");
+        }
+        break;
+    case op_ret_value:
+        fprintf(fasm,"\t%s\t%s\n","pop","esi");
+        fprintf(fasm,"\t%s\t%s\n","pop","edi");
+        fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
+        fprintf(fasm,fmt2,"mov","eax",dest);
+        if(var_flag==0){
+            fprintf(fasm,"\t%s\t%s,%s\n","mov","esp","ebp");
+            fprintf(fasm,"\t%s\t%s\n","pop","ebp");
+        }
+        fprintf(fasm,fmt0,"ret");
+        break;
+    case op_beq:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"je",dest);
+        break;
+    case op_bne:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jne",dest);
+        break;
+    case op_ble:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jle",dest);
+        break;
+    case op_bls:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jl",dest);
+        break;
+    case op_bgt:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jg",dest);
+        break;
+    case op_bge:
+        fprintf(fasm,fmt2,"mov","eax",src1);
+        fprintf(fasm,fmt2,"cmp","eax",src2);
+        fprintf(fasm,fmt1,"jge",dest);
+        break;
+    case op_jump:
+        fprintf(fasm,fmt1,"jmp",dest);
+        break;
+    case op_prints:
+        if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_printf","OFFSET","_fmt_out_s","OFFSET",dest);
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_printf","OFFSET","_fmt_out_s","OFFSET",dest);
+        }
+        break;
+    case op_printi:
+        if(quat_table[qx].dest[0]=='^'){
+            fprintf(fasm,fmt1,"push","eax");
+            fprintf(fasm,fmt2,"mov","eax",dest);
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i","eax");
+            fprintf(fasm,fmt1,"pop","eax");
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i",dest);
+        }
+        break;
+    case op_printc:
+        if(quat_table[qx].dest[0]=='^'){
+            fprintf(fasm,fmt1,"push","eax");
+            fprintf(fasm,fmt2,"mov","eax",dest);
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c","eax");
+            fprintf(fasm,fmt1,"pop","eax");
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c",dest);
+        }
+        break;
+    case op_scanfc:
+        if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_c","ADDR",dest);
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_c","OFFSET",dest);
+        }
+        break;
+    case op_scanfi:
+        if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_i","ADDR",dest);
+        }else{
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_i","OFFSET",dest);
+        }
+        break;
+    case op_set_label:
+        fprintf(fasm,"%s:\n",dest);
+        break;
+    case op_load_ret:
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+        break;
+    case op_arr_get:
+        fprintf(fasm,"\t%s\t%s,[%s]\n","lea","eax",src1);
+        fprintf(fasm,fmt2,"mov","ebx",src2);
+        fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov","eax","eax","ebx");
+        fprintf(fasm,fmt2,"mov",dest,"eax");
+//        fprintf(fasm,fmt2,"imul","eax","4");
+//        fprintf(fasm,fmt2,"add","eax","ebx");
+//        fprintf(fasm,"\t%s\t%s,dword ptr [%s]","mov",dest,"eax");
+        break;
+    default:
+        fprintf(fasm,"不合法指令\n");
+    }
+}
+void opt_gen_asm_code(){
+
+}
+void opt_reconvert_name(){
+}
 #endif // GENASM_H_INCLUDED
