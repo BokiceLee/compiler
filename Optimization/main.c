@@ -9,8 +9,14 @@
 #define E_NUM 100
 #define N_NUM 50
 #define DAG_NUM 1000
+#define VAR_NUM 100
+#define GLOBAL_REG_NUM 3
+#define MAX_SUFFIX 2
 int entryment[F_NUM][E_NUM];
 int entry_num[F_NUM];
+enum regs{
+    eax,ecx,edx,ebx,edi,esi,no_reg
+};
 enum op_code{
     op_add=0,op_sub,op_mul,op_idiv,//3
     op_mov,//4
@@ -80,6 +86,11 @@ void mov_struct(struct quat_struct* next_quat,struct src_quat src){
     next_quat->op=src.op;
     next_quat->next=NULL;
 }
+struct var_reg_struct{
+    char var[VAR_LEN];
+    int varx;
+    enum regs reg;
+};
 struct quat_struct* convert_quat_table(struct src_quat src[],int src_len){
     int i;
     struct quat_struct *head,*tail,*p;
@@ -101,14 +112,24 @@ struct quat_struct* convert_quat_table(struct src_quat src[],int src_len){
 }
 struct block_struct{
     struct quat_struct* block_begin;
-    struct block_struct* suffix[2];
+    struct block_struct* suffix[MAX_SUFFIX];
     int suffix_num;
+    char def[VAR_NUM][VAR_LEN];
+    char use[VAR_NUM][VAR_LEN];
+    char in[VAR_NUM][VAR_LEN];
+    char out[VAR_NUM][VAR_LEN];
+    int def_len;
+    int use_len;
+    int in_len;
+    int out_len;
 };
 struct funct_struct{
     struct block_struct blocks[B_NUM];
     int block_num;
     struct quat_struct* funct_begin;
     struct quat_struct* funct_end;
+    struct var_reg_struct var_reg[VAR_NUM];
+    int var_reg_len;
 };
 struct dag_map_struct{
     int node_id;
@@ -727,11 +748,373 @@ void exec_dag(int funct_num){
     }
 }
 
+int is_available_var(char name[]){
+    if(name[0]=='&'){
+        return 1;
+    }
+    if(name[0]=='@'){
+        return 1;
+    }
+    return 0;
+}
+int n_in_set(char ele[],char set[][VAR_LEN],int set_len){//传递下标
+    int i;
+    int r;
+    for(i=0;i<set_len;i++){
+        r=strcmp(ele,set[i]);
+        if(r>0){
+            continue;
+        }else if(r==0){
+            return -1;
+        }else{
+            return i;
+        }
+    }
+    return i;
+}
+int merge_set(char dest_set[][VAR_LEN],char set1[][VAR_LEN],int set1_len,char set2[][VAR_LEN],int set2_len){
+    char d_set[VAR_NUM][VAR_LEN];
+    int d_x=0;
+    int set1_x=0;
+    int set2_x=0;
+    int i;
+    while(set1_x<set1_len&&set2_x<set2_len){
+        if(strcmp(set1[set1_x],set2[set2_x])==-1){
+            strcpy(d_set[d_x],set2[set2_x]);
+            set2_x++;
+            d_x++;
+        }else{
+            strcpy(d_set[d_x],set1[set1_x]);
+            if(strcmp(set1[set1_x],set2[set2_x])==0){
+                set2_x++;
+            }
+            set1_x++;
+            d_x++;
+        }
+    }
+    if(set1_x==set1_len){
+        while(set2_x<set2_len){
+            strcpy(d_set[d_x],set2[set2_x]);
+            set2_x++;
+            d_x++;
+        }
+    }else{
+        while(set1_x<set1_len){
+            strcpy(d_set[d_x],set1[set1_x]);
+            set1_x++;
+            d_x++;
+        }
+    }
+    for(i=0;i<d_x;i++){
+        strcpy(dest_set[i],d_set[i]);
+    }
+    return d_x;
+}
+int sub_set(char dest_set[][VAR_LEN],char set1[][VAR_LEN],int set1_len,char set2[][VAR_LEN],int set2_len){
+    int i;
+    char d_set[VAR_NUM][VAR_LEN];
+    int d_set_x=0;
+    for(i=0;i<set1_len;i++){
+        if(n_in_set(set1[i],set2,set2_len)==-1){
+            strcpy(d_set[d_set_x],set1[i]);
+            d_set_x++;
+        }
+    }
+    if(dest_set!=NULL){
+        for(i=0;i<d_set_x;i++){
+            strcpy(dest_set[i],d_set[i]);
+        }
+    }
+    return d_set_x;
+}
+void insert_ele(char ele[],int ele_x,char set[][VAR_LEN],int set_len){
+    int i=set_len;
+    while(i>ele_x){
+        strcpy(set[i],set[i-1]);
+        i--;
+    }
+    strcpy(set[ele_x],ele);
+}
+
+void add_ele(int use_def,char name[],struct block_struct *p_block){//use:0,def:1
+    int ndefed;
+    int nused;
+    if(!is_available_var(name)){
+        return;
+    }
+    if(use_def==0){
+        ndefed=n_in_set(name,p_block->def,p_block->def_len);
+        if(ndefed!=-1){
+            nused=n_in_set(name,p_block->use,p_block->use_len);
+            if(nused!=-1){
+                insert_ele(name,nused,p_block->use,p_block->use_len);
+                p_block->use_len++;
+            }
+        }
+    }else{
+        nused=n_in_set(name,p_block->use,p_block->use_len);
+        if(nused!=-1){
+            ndefed=n_in_set(name,p_block->def,p_block->def_len);
+            if(ndefed!=-1){
+                insert_ele(name,ndefed,p_block->def,p_block->def_len);
+                p_block->def_len++;
+            }
+        }
+    }
+}
+int eql_set(char set1[][VAR_LEN],int set1_len,char set2[][VAR_LEN],int set2_len){
+    int i;
+    if(set1_len!=set2_len){
+        return 0;
+    }
+    for(i=0;i<set1_len;i++){
+        if(strcmp(set1[i],set2[i])!=0){
+            return 0;
+        }
+    }
+    return 1;
+}
+void get_use_def(struct block_struct *p_block){
+    struct quat_struct *p;
+    p_block->def_len=0;
+    p_block->use_len=0;
+    p=p_block->block_begin;
+    while(p!=NULL){
+        switch(p->op){
+        case op_printc:
+        case op_printi:
+        case op_ret_value:
+        case op_para:
+            add_ele(0,p->dest,p_block);
+            break;
+        case op_add:
+        case op_sub:
+        case op_mul:
+        case op_idiv:
+            add_ele(0,p->src1,p_block);
+            add_ele(0,p->src2,p_block);
+            add_ele(1,p->dest,p_block);
+            break;
+        case op_arr_assign:
+        case op_bne:
+        case op_beq:
+        case op_bge:
+        case op_bgt:
+        case op_ble:
+        case op_bls:
+            add_ele(0,p->src1,p_block);
+            add_ele(0,p->src2,p_block);
+            break;
+        case op_arr_get:
+            add_ele(0,p->src2,p_block);
+            add_ele(1,p->dest,p_block);
+            break;
+        case op_scanfi:
+        case op_scanfc:
+            add_ele(1,p->dest,p_block);
+            break;
+        case op_mov:
+            add_ele(0,p->src1,p_block);
+            add_ele(1,p->dest,p_block);
+        default:
+            ;
+        }
+        p=p->next;
+    }
+}
+struct block_struct* find_block(char name[],int funcx){
+    int i;
+    for(i=0;i<funct_stru[funcx].block_num;i++){
+        if(funct_stru[funcx].blocks[i].block_begin->op==op_set_label){
+            if(strcmp(funct_stru[funcx].blocks[i].block_begin->dest,name)==0){
+                return &(funct_stru[funcx].blocks[i]);
+            }
+        }
+    }
+    return NULL;
+}
+void set_suffix(int funcx,int blocki){
+    struct quat_struct* p;
+    struct block_struct* p_block;
+    funct_stru[funcx].blocks[blocki].suffix_num=0;
+    p=funct_stru[funcx].blocks[blocki].block_begin;
+    while(p->next!=NULL){
+        p=p->next;
+    }
+    switch(p->op){
+    case op_jump:
+        p_block=find_block(p->dest,funcx);
+        funct_stru[funcx].blocks[blocki].suffix[funct_stru[funcx].blocks[blocki].suffix_num++]=p_block;
+        break;
+    case op_beq:
+    case op_bne:
+    case op_bge:
+    case op_bgt:
+    case op_ble:
+    case op_bls:
+        p_block=find_block(p->dest,funcx);
+        funct_stru[funcx].blocks[blocki].suffix[funct_stru[funcx].blocks[blocki].suffix_num++]=p_block;
+        p_block=&(funct_stru[funcx].blocks[blocki+1]);
+        funct_stru[funcx].blocks[blocki].suffix[funct_stru[funcx].blocks[blocki].suffix_num++]=p_block;
+        break;
+    case op_ret_value:
+    case op_ret_void:
+        break;
+    default:
+        p_block=&(funct_stru[funcx].blocks[blocki+1]);
+        funct_stru[funcx].blocks[blocki].suffix[funct_stru[funcx].blocks[blocki].suffix_num++]=p_block;
+        break;
+    }
+}
+char all_out[VAR_NUM][VAR_LEN];
+int all_out_len=0;
+int conflict_matrix[VAR_NUM][VAR_NUM];//对每个函数进行
+int cal_in(char d_set[][VAR_LEN],struct block_struct *p_block){
+    int i;
+    char new_out[VAR_NUM][VAR_LEN];
+    int new_out_len=0;
+    int d_set_len=0;
+    char sub_res[VAR_NUM][VAR_LEN];
+    int sub_res_len=0;
+    for(i=0;i<p_block->suffix_num;i++){
+        new_out_len=merge_set(new_out,new_out,new_out_len,p_block->suffix[i]->in,p_block->suffix[i]->in_len);
+    }
+    for(i=0;i<new_out_len;i++){
+        strcpy(p_block->out[i],new_out[i]);
+    }
+    p_block->out_len=new_out_len;
+    sub_res_len=sub_set(sub_res,new_out,new_out_len,p_block->def,p_block->def_len);
+    d_set_len=merge_set(d_set,p_block->use,p_block->use_len,sub_res,sub_res_len);
+    return d_set_len;
+}
+void cal_in_out(int funcx){
+    int haschanged=0;
+    int i,j;
+    struct block_struct *p_block;
+    char new_in[VAR_NUM][VAR_LEN];
+    int new_in_len=0;
+    for(i=funct_stru[funcx].block_num-1;i>=0;i--){
+         funct_stru[funcx].blocks[i].in_len=0;
+         funct_stru[funcx].blocks[i].out_len=0;
+    }
+    while(1){
+        for(i=funct_stru[funcx].block_num-2;i>=0;i--){
+            p_block=&(funct_stru[funcx].blocks[i]);
+            haschanged=0;
+            new_in_len=cal_in(new_in,p_block);
+            if(eql_set(p_block->in,p_block->in_len,new_in,new_in_len)==0){
+                for(j=0;j<new_in_len;j++){
+                    strcpy(p_block->in[j],new_in[j]);
+                }
+                p_block->in_len=new_in_len;
+                haschanged=1;
+            }
+        }
+        if(haschanged==0){
+            break;
+        }
+    }
+}
+void convert2x(char vars[][VAR_LEN],int varx[],int v_len){
+    int i,j;
+    for(i=0;i<v_len;i++){
+        for(j=0;j<all_out_len;j++){
+            if(strcmp(vars[i],all_out[j])==0){
+                varx[i]=j;
+                break;
+            }
+        }
+    }
+}
+void build_conflit_matrix(int funcx){
+    int i,j,k;
+    int var_xs[VAR_NUM];
+    char block_var[VAR_NUM][VAR_LEN];
+    int bvar_len;
+    all_out_len=0;
+    for(i=0;i<funct_stru[funcx].block_num;i++){//合并out，得到跨基本块的变量
+        all_out_len=merge_set(all_out,all_out,all_out_len,funct_stru[funcx].blocks[i].out,funct_stru[funcx].blocks[i].out_len);
+    }
+    for(j=0;j<all_out_len;j++){//变量之间初始化为无冲突
+        for(k=0;k<all_out_len;k++){
+            conflict_matrix[j][k]=0;
+        }
+    }
+    for(i=0;i<funct_stru[funcx].block_num;i++){//同处一个基本跨in或out的变量之间存在冲突,是否有变量存在于in中但不存在于out中
+        bvar_len=merge_set(block_var,funct_stru[funcx].blocks[i].in,funct_stru[funcx].blocks[i].in_len,funct_stru[funcx].blocks[i].out,funct_stru[funcx].blocks[i].out_len);
+        convert2x(block_var,var_xs,bvar_len);//将变量名转化为其中out中的下表
+        for(j=0;j<bvar_len;j++){//标识有冲突变量
+            for(k=j+1;k<bvar_len;k++){
+                conflict_matrix[var_xs[j]][var_xs[k]]=1;
+                conflict_matrix[var_xs[k]][var_xs[j]]=1;
+            }
+        }
+    }
+}
+void alloct_reg(int funcx){
+    int conflict_num[all_out_len];
+    int regs_used[GLOBAL_REG_NUM]={0,0,0};
+    enum regs distributed_reg;
+    int stack[VAR_NUM];
+    int stack_x=0;
+    int pop_x;
+    int i,j;
+    for(i=0;i<all_out_len;i++){
+        conflict_num[i]=0;
+        for(j=0;j<all_out_len;j++){
+            conflict_num[i]+=conflict_matrix[i][j];
+        }
+    }//获得每个寄存器的冲突数
+    for(i=0;i<all_out_len;i++){
+        if(conflict_num[i]>=GLOBAL_REG_NUM){//如果冲突数大于等于寄存器个数，移除
+            //对每个与其相连的变量，冲突数减一,更新冲突数
+            for(j=i+1;j<all_out_len;j++){
+                if(conflict_matrix[i][j]==1){
+                    conflict_num[j]--;
+                }
+            }
+        }else{//否则入栈
+            stack[stack_x++]=i;
+            for(j=i+1;j<all_out_len;j++){
+                if(conflict_matrix[i][j]==1){
+                    conflict_num[j]--;
+                }
+            }
+        }
+    }
+    while(stack_x>0){
+        pop_x=stack[--stack_x];
+        distributed_reg=no_reg;
+        for(i=0;i<funct_stru[funcx].var_reg_len;i++){//找到不与该变量有连接边的已分配的寄存器的变量对应的寄存器
+            if(conflict_matrix[pop_x][funct_stru[funcx].var_reg[i].varx]==0){
+                distributed_reg=funct_stru[funcx].var_reg[i].reg;//将其分配给该变量
+                break;
+            }
+        }
+        if(distributed_reg==no_reg){
+            for(i=0;i<GLOBAL_REG_NUM;i++){
+                if(regs_used[i]==0){
+                    distributed_reg=i;
+                    regs_used[i]=1;
+                    break;
+                }
+            }
+        }
+        if(distributed_reg==no_reg){
+            printf("998:无法分配\n");
+        }
+        funct_stru[funcx].var_reg[funct_stru[funcx].var_reg_len].reg=distributed_reg;
+        funct_stru[funcx].var_reg[funct_stru[funcx].var_reg_len].varx=pop_x;
+        strcpy(funct_stru[funcx].var_reg[funct_stru[funcx].var_reg_len].var,all_out[pop_x]);
+        funct_stru[funcx].var_reg_len++;
+    }
+}
+
 int main()
 {
     struct quat_struct *head,*code,*p,*data;
     struct src_quat src[600];
-    int i,j;
+    int i,j,k;
     int quat_num;
     int funct_num;
     head=NULL;
@@ -759,29 +1142,64 @@ int main()
     }
     divide_blocks(code,src,funct_num);
     exec_dag(funct_num);
-    quat_num=0;
-    for(p=data;p!=NULL;p=p->next){
-        src[quat_num].op=p->op;
-        strcpy(src[quat_num].dest,p->dest);
-        strcpy(src[quat_num].src1,p->src1);
-        strcpy(src[quat_num].src2,p->src2);
-        quat_num++;
-    }
     for(i=0;i<funct_num;i++){
         for(j=0;j<funct_stru[i].block_num;j++){
-            p=funct_stru[i].blocks[j].block_begin;
-            while(p!=NULL){
-                src[quat_num].op=p->op;
-                strcpy(src[quat_num].dest,p->dest);
-                strcpy(src[quat_num].src1,p->src1);
-                strcpy(src[quat_num].src2,p->src2);
-                p=p->next;
-                quat_num++;
+            get_use_def(&(funct_stru[i].blocks[j]));
+            set_suffix(i,j);
+            printf("\nfunct %d block %d \nuse: ",i,j);
+            for(k=0;k<funct_stru[i].blocks[j].use_len;k++){
+                printf("%s ",funct_stru[i].blocks[j].use[k]);
+            }
+            printf("\ndef: ");
+            for(k=0;k<funct_stru[i].blocks[j].def_len;k++){
+                printf("%s ",funct_stru[i].blocks[j].def[k]);
             }
         }
     }
-    for(i=0;i<quat_num;i++){
-        printf("%d %s %s %s %s\n",i,op_name[src[i].op],src[i].dest,src[i].src1,src[i].src2);
+    for(i=0;i<funct_num;i++){
+        cal_in_out(i);
+        for(j=0;j<funct_stru[i].block_num;j++){
+            printf("\nfunct %d block %d \nin: ",i,j);
+            for(k=0;k<funct_stru[i].blocks[j].in_len;k++){
+                printf("%s ",funct_stru[i].blocks[j].in[k]);
+            }
+            printf("\nout: ");
+            for(k=0;k<funct_stru[i].blocks[j].out_len;k++){
+                printf("%s ",funct_stru[i].blocks[j].out[k]);
+            }
+        }
     }
+    for(i=0;i<funct_num;i++){
+        build_conflit_matrix(i);
+        alloct_reg(i);
+        printf("\nfunct %d",i);
+        for(j=0;j<funct_stru[i].var_reg_len;j++){
+            printf("\n%s,%d",funct_stru[i].var_reg[j].var,funct_stru[i].var_reg[j].reg);
+        }
+    }
+//    quat_num=0;
+//    for(p=data;p!=NULL;p=p->next){
+//        src[quat_num].op=p->op;
+//        strcpy(src[quat_num].dest,p->dest);
+//        strcpy(src[quat_num].src1,p->src1);
+//        strcpy(src[quat_num].src2,p->src2);
+//        quat_num++;
+//    }
+//    for(i=0;i<funct_num;i++){
+//        for(j=0;j<funct_stru[i].block_num;j++){
+//            p=funct_stru[i].blocks[j].block_begin;
+//            while(p!=NULL){
+//                src[quat_num].op=p->op;
+//                strcpy(src[quat_num].dest,p->dest);
+//                strcpy(src[quat_num].src1,p->src1);
+//                strcpy(src[quat_num].src2,p->src2);
+//                p=p->next;
+//                quat_num++;
+//            }
+//        }
+//    }
+//    for(i=0;i<quat_num;i++){
+//        printf("%d %s %s %s %s\n",i,op_name[src[i].op],src[i].dest,src[i].src1,src[i].src2);
+//    }
     return 0;
 }
