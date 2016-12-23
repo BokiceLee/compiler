@@ -25,6 +25,7 @@ struct dag_map_node{
 struct dag_list_node{
     int node_n[N_NUM];//同名节点在不同时间修改,怎么处理
     int node_x=-1;
+    int node_x_f=-1;
     char name[VAR_LEN];
 };
 struct basic_block basic_blocks[FUNC_NUM][BLOCK_NUM];
@@ -269,9 +270,7 @@ void handle_node(int op,char dest[],char src1[],char src2[]){
         insert2dag_list(dest_n,dest);
     }
 }
-void build_dag(struct basic_block block){
-    int beginx=block.beginx;
-    int endx=block.endx;
+void build_dag(int beginx,int endx){
     for(i=beginx;i<=endx;i++){
         switch(quat_table[i].op){
         case op_add:
@@ -308,6 +307,15 @@ void reverse_queue(int export_queue[],int export_n){
         export_queue[export_n-i]=tmp;
         i++;
     }
+}
+void is_used_later(char tmp[],int row_after){
+    while(quat_table[row_after].op!=op_efunc&&quat_table[row_after].op!=op_emain){
+        if(strcmp(quat_table[row_after].src1,tmp)==0||strcmp(quat_table[row_after].src2,tmp)==0){
+            return 1;
+        }
+        row_after++;
+    }
+    return 0;
 }
 void export_dag(){
     int i;

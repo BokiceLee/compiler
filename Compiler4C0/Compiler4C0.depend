@@ -4,3 +4,38 @@
 	<stdlib.h>
 	<string.h>
 
+1480840286 source:e:\studyinschool\compiler\homework\finalhw\compiler4c0\main.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<ctype.h>
+	"Global.h"
+	"Error.h"
+	"GenAsm.h"
+	"LexicalAnalysis.h"
+	"SymbolManagement.h"
+	"GenQuaternary.h"
+	"GrammarAnalysis.h"
+
+1480856406 e:\studyinschool\compiler\homework\finalhw\compiler4c0\global.h
+
+1480854472 e:\studyinschool\compiler\homework\finalhw\compiler4c0\error.h
+	"LexicalAnalysis.h"
+
+1480852661 e:\studyinschool\compiler\homework\finalhw\compiler4c0\genasm.h
+	"GenQuaternary.h"
+
+1480853690 e:\studyinschool\compiler\homework\finalhw\compiler4c0\lexicalanalysis.h
+	"SymbolManagement.h"
+
+1480433600 e:\studyinschool\compiler\homework\finalhw\compiler4c0\optimization.h
+	"GenQuaternary.h"
+
+1480422154 e:\studyinschool\compiler\homework\finalhw\compiler4c0\semanticanalysis.h
+
+1480424591 e:\studyinschool\compiler\homework\finalhw\compiler4c0\symbolmanagement.h
+
+1480554357 e:\studyinschool\compiler\homework\finalhw\compiler4c0\genquaternary.h
+
+1481554446 e:\studyinschool\compiler\homework\finalhw\compiler4c0\grammaranalysis.h
+
