@@ -12,8 +12,8 @@
 #define VAR_NUM 100
 #define GLOBAL_REG_NUM 3
 #define MAX_SUFFIX 2
-enum regs{//寄存器
-    eax,ecx,edx,ebx,edi,esi,no_reg
+enum regs{//寄存器0-2全局寄存器，3-5临时寄存器
+    ebx,edi,esi,eax,ecx,edx,no_reg
 };
 struct opt_quat_struct{//优化时所用的四元式结构
     int quat_id;
@@ -67,6 +67,7 @@ int entryment[F_NUM][E_NUM];//每个函数的入口语句
 int entry_num[F_NUM];//每个函数入口语句个数
 struct opt_quat_struct *data;
 struct funct_struct functs[F_NUM];//函数
+int g_funct_num;
 struct opt_quat_struct *seq_begin,*after_seq;//消除局部公共子表达式的连续四元式的第一个式子和下一个式子
 struct dag_map_struct dag_map[DAG_NUM];//dag图
 struct dag_table_struct dag_table[DAG_NUM];//dag表
@@ -1032,6 +1033,7 @@ void optimize()
     p=head;
     i=0;
     funct_num=find_entries(quat_table,quat_num);
+    g_funct_num=funct_num;
     for(i=0;i<funct_num;i++){
         entry_num[i]=sort_entryment(entryment[i],entry_num[i]);
     }
