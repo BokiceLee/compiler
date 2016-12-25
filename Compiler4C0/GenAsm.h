@@ -355,51 +355,9 @@ void reconvert_name(char res[],char src[]){
 }
 
 
-struct local_reg_var_struct{
-    char var_name[VAR_LEN];
-    int valid;
-    int need_write_back;
-};
-struct local_reg_var_struct local_reg_var[6];
-enum regs reg_pool[LOCAL_REG_NUM]={edx,ecx,eax};
-int reg_pool_x=3;
-int reg_var_x=0;
 int r_tmp_var_flag[R_TMP_VAR_NUM];
-char reg_name[6][5]={"ebx","edi","esi","eax","ecx","edx"};
-enum quat_types{all_same_reg,all_same_var};
 //申请临时寄存器
-void sendback_reg(char tmp_reg_name[]){//将不在other中出现的临时寄存器返回
-    int i;
-    for(i=3;i<6;i++){
-        if(local_reg_var[i].valid==1){
-            if(strcmp(reg_name[i],tmp_reg_name)==0){
-                if(local_reg_var[i].need_write_back==1){
-                    fprintf(fasm,"\t%s\t%s,%s\n","mov",local_reg_var[i].var_name,reg_name[i]);
-                }
-                local_reg_var[i].valid=0;
-                reg_pool[reg_pool_x++]=i;
-                return;
-            }
-        }
-    }
-}
-int apply_reg(char tmp_reg[],char dest[],char other1[],char other2[],int need_write_back){
-    int i;
-    int reg_x;
-    if(reg_pool_x==0){
-        for(i=3;i<6;i++){
-            if(strcmp(other1,reg_name[i])!=0&&strcmp(other2,reg_name[i])!=0){
-                sendback_reg(reg_name[i]);
-                break;
-            }
-        }
-    }
-    reg_x=reg_pool[--reg_pool_x];
-    local_reg_var[reg_x].valid=1;
-    local_reg_var[reg_x].need_write_back=need_write_back;
-    strcpy(local_reg_var[reg_x].var_name,dest);//替换
-    strcpy(tmp_reg,reg_name[reg_x]);
-}
+
 
 void opt_gen_asm(){
     int i=0;
@@ -468,37 +426,35 @@ int opt_gen_asm_local_data(int funcx){
     }
     return lc_data_num;
 }
-int n_mem(char mmm[]){
+char global_reg_name[3][5]={"ebx","edi","esi"};
+int var_is_para(char vvv[]){
+    return vvv[0]=='[';
+}
+int var_is_mem(char vvv[]){
+    return vvv[0]=='_'||vvv[0]=='@';
+}
+int var_is_int(char vvv[]){
     int i;
-    for(i=0;i<6;i++){
-        if(strcmp(mmm,reg_name[i])==0){
-            return 1;
+    if(vvv[0]=='\0'){
+        return 0;
+    }
+    for(i=0;vvv[i]!='\0';i++){
+        if(isdigit(vvv[i])==0){
+            return 0;
         }
     }
-    if(mmm[0]=='#'||mmm[0]=='$'){
-        return 1;
-    }
-    return 0;
+    return 1;
 }
-int is_reg(char rrr[]){
+int var_is_reg(char vvv[]){
     int i;
-    for(i=0;i<6;i++){
-        if(strcmp(rrr,reg_name[i])==0){
+    for(i=0;i<3;i++){
+        if(strcmp(global_reg_name[i],vvv)==0){
             return 1;
         }
     }
     return 0;
 }
 
-int is_global_reg(char vvv[]){
-    int i;
-    for(i=0;i<3;i++){
-        if(strcmp(vvv,reg_name[i])==0){
-            return 1;
-        }
-    }
-    return 0;
-}
 void opt_sub_reconvert(char res[],char src[]){
     switch(src[0]){
     case '&'://临时变量
@@ -521,7 +477,7 @@ void opt_sub_reconvert(char res[],char src[]){
         sprintf(res,"[ebp+%d]",4+4*atoi(src+1));
         return;
     default:
-        if(is_reg(src)){
+        if(var_is_reg(src)){
             sprintf(res,"%s",src);
         }else if(src[0]!='@'){//全局变量
             sprintf(res,"_%s",src);
@@ -541,32 +497,16 @@ void opt_reconvert_name(int funcx,struct opt_quat_struct* p,char dest[],char src
     int src2_flag=0;
     for(i=0;i<functs[funcx].var_reg_len;i++){
         if(strcmp(p->dest,functs[funcx].var_reg[i].var)==0){
-            strcpy(lc_dest,reg_name[functs[funcx].var_reg[i].reg]);
+            strcpy(lc_dest,global_reg_name[functs[funcx].var_reg[i].reg]);
             dest_flag=1;
         }
         if(strcmp(p->src1,functs[funcx].var_reg[i].var)==0){
-            strcpy(lc_src1,reg_name[functs[funcx].var_reg[i].reg]);
+            strcpy(lc_src1,global_reg_name[functs[funcx].var_reg[i].reg]);
             src1_flag=1;
         }
         if(strcmp(p->src2,functs[funcx].var_reg[i].var)==0){
-            strcpy(lc_src2,reg_name[functs[funcx].var_reg[i].reg]);
+            strcpy(lc_src2,global_reg_name[functs[funcx].var_reg[i].reg]);
             src2_flag=1;
-        }
-    }
-    for(i=3;i<6;i++){//临时寄存器表存放原变量
-        if(local_reg_var[i].valid==1){
-            if(strcmp(p->dest,local_reg_var[i].var_name)==0){
-                strcpy(lc_dest,reg_name[i]);
-                dest_flag=1;
-            }
-            if(strcmp(p->src1,local_reg_var[i].var_name)==0){
-                strcpy(lc_src1,reg_name[i]);
-                src1_flag=1;
-            }
-            if(strcmp(p->dest,local_reg_var[i].var_name)==0){
-                strcpy(lc_src2,reg_name[i]);
-                src2_flag=1;
-            }
         }
     }
     if(dest_flag==1){
@@ -585,15 +525,7 @@ void opt_reconvert_name(int funcx,struct opt_quat_struct* p,char dest[],char src
         opt_sub_reconvert(src2,p->src2);
     }
 }
-int is_int(char var_nnn[]){
-    if(var_nnn[0]=='#'){
-        return 1;
-    }
-    if(var_nnn[0]=='$'){
-        return 1;
-    }
-    return 0;
-}
+
 void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is_main){
     char dest[VAR_LEN];
     char src1[VAR_LEN];
@@ -601,139 +533,122 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
     char* fmt0="\t%s\n";
     char* fmt1="\t%s\t%s\n";
     char* fmt2="\t%s\t%s,%s\n";
-    char tmp_reg[LOCAL_REG_NUM][5];
+    char ce_name[VAR_LEN];
     opt_reconvert_name(funcx,p,dest,src1,src2);//能转换的全转换
     switch(p->op){
     case op_add:
         if(strcmp(dest,src1)==0){
-            if(is_reg(src1)){
+            if(var_is_para(dest)){
+                fprintf(fasm,fmt2,"mov","eax",src1);
+                fprintf(fasm,fmt2,"add","eax",src2);
+                fprintf(fasm,fmt2,"mov",dest,"eax");
+            }else if(var_is_reg(dest)){
                 fprintf(fasm,fmt2,"add",dest,src2);
-            }else if(n_mem(src2)){//不是内存值
-                fprintf(fasm,fmt2,"add",dest,src2);
-            }else{
-                if(p->src2[0]!='$'&&p->src2[0]!='#'){
-                    apply_reg(tmp_reg[0],src2,dest,src1,1);//位置0为替换结果，位置1为替换目标，申请一个未在其他位置出现的临时寄存器
-                    fprintf(fasm,fmt2,"mov",tmp_reg[0],src2);
-                    fprintf(fasm,fmt2,"add",dest,tmp_reg[0]);
-                }else{
+            }else if(var_is_mem(dest)){
+                if(var_is_mem(src2)||var_is_reg(src2)){
                     fprintf(fasm,fmt2,"add",dest,src2);
+                }else{
+                    fprintf(fasm,fmt2,"mov","eax",src1);
+                    fprintf(fasm,fmt2,"add","eax",src2);
+                    fprintf(fasm,fmt2,"mov",dest,"eax");
                 }
+            }else{
+                printf("未考虑\n");
             }
         }else{
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            fprintf(fasm,fmt2,"add",tmp_reg[0],src2);
-            fprintf(fasm,fmt2,"mov",dest,tmp_reg[0]);
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"add","eax",src2);
+            fprintf(fasm,fmt2,"mov",dest,"eax");
         }
         break;
     case op_sub:
         if(strcmp(dest,src1)==0){
-            if(is_reg(src1)){
+            if(var_is_para(dest)){
+                fprintf(fasm,fmt2,"mov","eax",src1);
+                fprintf(fasm,fmt2,"sub","eax",src2);
+                fprintf(fasm,fmt2,"mov",dest,"eax");
+            }else if(var_is_reg(dest)){
                 fprintf(fasm,fmt2,"sub",dest,src2);
-            }else if(n_mem(src2)){
-                fprintf(fasm,fmt2,"sub",dest,src2);
-            }else{
-                if(p->src2[0]!='$'&&p->src2[0]!='#'){
-                    apply_reg(tmp_reg[0],src2,dest,src1,1);
-                    fprintf(fasm,fmt2,"mov",tmp_reg[0],src2);
-                    fprintf(fasm,fmt2,"sub",dest,tmp_reg[0]);
-                }else{
+            }else if(var_is_mem(dest)){
+                if(var_is_mem(src2)||var_is_reg(src2)){
                     fprintf(fasm,fmt2,"sub",dest,src2);
+                }else{
+                    fprintf(fasm,fmt2,"mov","eax",src1);
+                    fprintf(fasm,fmt2,"sub","eax",src2);
+                    fprintf(fasm,fmt2,"mov",dest,"eax");
                 }
+            }else{
+                printf("未考虑\n");
             }
         }else{
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg,src1);
-            fprintf(fasm,fmt2,"sub",tmp_reg,src2);
-            fprintf(fasm,fmt2,"mov",dest,tmp_reg);
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"sub","eax",src2);
+            fprintf(fasm,fmt2,"mov",dest,"eax");
         }
         break;
     case op_mul:
         if(strcmp(dest,src1)==0){
-            if(is_reg(src1)){
-                fprintf(fasm,fmt2,"imul",dest,src2);
-            }else if(n_mem(src2)){
-                fprintf(fasm,fmt2,"imul",dest,src2);
-            }else{
-                if(p->src2[0]!='$'&&p->src2[0]!='#'){
-                    apply_reg(tmp_reg[0],src2,dest,src1,1);
-                    fprintf(fasm,fmt2,"mov",tmp_reg[0],src2);
-                    fprintf(fasm,fmt2,"imul",dest,tmp_reg[0]);
-                }else{
+            if(var_is_para(dest)){
+                fprintf(fasm,fmt2,"mov","eax",src1);
+                fprintf(fasm,fmt2,"imul","eax",src2);
+                fprintf(fasm,fmt2,"mov",dest,"eax");
+            }else if(var_is_reg(dest)){
+                fprintf(fasm,fmt2,"add",dest,src2);
+            }else if(var_is_mem(dest)){
+                if(var_is_mem(src2)||var_is_reg(src2)){
                     fprintf(fasm,fmt2,"imul",dest,src2);
+                }else{
+                    fprintf(fasm,fmt2,"mov","eax",src1);
+                    fprintf(fasm,fmt2,"imul","eax",src2);
+                    fprintf(fasm,fmt2,"mov",dest,"eax");
                 }
+            }else{
+                printf("未考虑\n");
             }
         }else{
-            apply_reg(tmp_reg,src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg,src1);
-            fprintf(fasm,fmt2,"imul",tmp_reg,src2);
-            fprintf(fasm,fmt2,"mov",dest,tmp_reg);
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"imul","eax",src2);
+            fprintf(fasm,fmt2,"mov",dest,"eax");
         }
         break;
     case op_idiv://被除数只能是mem或ebx
-        sendback_reg("eax");
-        sendback_reg("edx");
-        sendback_reg("ecx");
-        opt_sub_reconvert(dest,p->dest);
-        opt_sub_reconvert(src1,p->src1);
-        opt_sub_reconvert(src2,p->src2);
-        //fprintf(fasm,fmt1,"push","ebx");
-
-        fprintf(fasm,fmt2,"mov","eax",src1);//不是edx和eax
+        fprintf(fasm,fmt2,"mov","eax",src1);
         fprintf(fasm,fmt0,"cdq");
-        if(p->src2[0]=='$'||p->src2[0]=='^'||p->src2[0]=='#'){
-            fprintf(fasm,fmt2,"mov","ebx",src2);
-            fprintf(fasm,fmt1,"idiv","ebx");
-        }else{
+        if(var_is_para(src2)||var_is_int(src2)){
+            fprintf(fasm,fmt2,"mov","ecx",src2);
+            fprintf(fasm,fmt1,"idiv","ecx");
+        }else if(var_is_mem(src2)||var_is_reg(src2)){
             fprintf(fasm,fmt1,"idiv",src2);
         }
         fprintf(fasm,fmt2,"mov",dest,"eax");
         break;
     case op_mov:
-        if(p->dest[0]!='$'&&p->dest[0]!='#'&&!is_reg(dest)){
-            if(p->src1[0]!='$'&&p->src1[0]!='#'&&!is_reg(src1)){
-                apply_reg(tmp_reg,src1,dest,"",1);
-                fprintf(fasm,fmt2,"mov",tmp_reg,src1);
-                fprintf(fasm,fmt2,"mov",dest,tmp_reg);
-                break;
-            }
+        if(
+           ( var_is_mem(dest) || var_is_para(dest) )
+           &&
+           ( var_is_mem(src1) || var_is_para(src1) ) ){
+           fprintf(fasm,fmt2,"mov","eax",src1);
+           fprintf(fasm,fmt2,"mov",dest,"eax");
+        }else{
+            fprintf(fasm,fmt2,"mov",dest,src1);
         }
-//        if(quat_table[qx].src1[0]=='$'&&quat_table[qx].dest[0]!='^'){
-        fprintf(fasm,fmt2,"mov",dest,src1);
         break;
     case op_arr_assign:
-        apply_reg(tmp_reg[0],dest,src1,src2,0);
-        fprintf(fasm,"\t%s\t%s,[%s]\n","lea",tmp_reg[0],dest);
-        if(is_reg(src1)){
-            strcpy(tmp_reg[1],src1);
-        }else{
-            if(p->src1[0]=='$'||p->src1[0]=='#'){
-                apply_reg(tmp_reg[1],src1,src2,tmp_reg[0],0);
+        fprintf(fasm,"\t%s\t%s,[%s]\n","lea","eax",dest);
+        if(var_is_reg(src2)){
+            if(var_is_reg(src1)||var_is_int(src1)||var_is_mem(src1)){
+                fprintf(fasm,"\t%s\t[%s+4*%s],%s\n","mov","eax",src1,src2);
             }else{
-                apply_reg(tmp_reg[1],src1,src2,tmp_reg[0],1);
+                fprintf(fasm,fmt2,"mov","ecx",src1);
+                fprintf(fasm,"\t%s\t[%s+4*%s],%s\n","mov","eax","ecx",src2);
             }
-            fprintf(fasm,fmt2,"mov",tmp_reg[1],src1);
-        }
-        if(is_reg(src2)){
-            strcpy(tmp_reg[1],src2);
         }else{
-            if(p->src2[0]=='$'||p->src2[0]=='#'){
-                apply_reg(tmp_reg[2],src2,tmp_reg[0],tmp_reg[1],0);
-            }else{
-                apply_reg(tmp_reg[2],src2,tmp_reg[0],tmp_reg[1],1);
-            }
-            fprintf(fasm,fmt2,"mov",tmp_reg[2],src2);
+            fprintf(fasm,fmt2,"mov","ecx",src1);
+            fprintf(fasm,fmt2,"mov","edx",src2);
+            fprintf(fasm,"\t%s\t[%s+4*%s],%s\n","mov","eax","ecx","edx");
         }
-        fprintf(fasm,"\t%s\t[%s+4*%s],%s\n","mov",tmp_reg[0],tmp_reg[1],tmp_reg[2]);
-        sendback_reg(tmp_reg[0]);
-//        fprintf(fasm,fmt2,"mov","dest",src1);
-//        fprintf(fasm,fmt2,"imul","ebx","4");
-//        fprintf(fasm,"\t%s\tdword ptr [%s],%s","mov","eax",src2);
         break;
     case op_ret_void:
-        sendback_reg("eax");
-        sendback_reg("ecx");
-        sendback_reg("edx");
         fprintf(fasm,"\t%s\t%s\n","pop","esi");
         fprintf(fasm,"\t%s\t%s\n","pop","edi");
         fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
@@ -748,17 +663,10 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_ret_value:
-        sendback_reg("eax");
-        sendback_reg("ecx");
-        sendback_reg("edx");
         fprintf(fasm,"\t%s\t%s\n","pop","esi");
         fprintf(fasm,"\t%s\t%s\n","pop","edi");
         fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
-        if(strcmp(dest,"eax")==0){
-            ;
-        }else{
-            fprintf(fasm,fmt2,"mov","eax",dest);
-        }
+        fprintf(fasm,fmt2,"mov","eax",dest);
         if(var_flag==0){
             fprintf(fasm,"\t%s\t%s,%s\n","mov","esp","ebp");
             fprintf(fasm,"\t%s\t%s\n","pop","ebp");
@@ -766,17 +674,13 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         fprintf(fasm,fmt0,"ret");
         break;
     case op_beq:
-        if(!is_reg(src1)&&!is_reg(src2)&&(p->src1[0]!='$'&&p->src1[0]!='#')&&(p->src2[0]!='$'&&p->src2[0]!='#')){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            fprintf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"je",dest);
-            break;
-        }
-        if((p->src1[0]=='$'||p->src1[0]=='#')&&(p->src2[0]=='$'&&p->src2[0]=='#')){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            printf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        }else if(var_is_int(src1)&&var_is_int(src2)){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"je",dest);
         }else{
             fprintf(fasm,fmt2,"cmp",src1,src2);
@@ -784,17 +688,13 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_bne:
-        if(!is_reg(src1)&&!is_reg(src2)&&(p->src1[0]!='$'&&p->src1[0]!='#')&&(p->src2[0]!='$'&&p->src2[0]!='#')){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            fprintf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jne",dest);
-            break;
-        }
-        if(is_int(p->src1)&&is_int(p->src2)){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            printf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        }else if(var_is_int(src1)&&var_is_int(src2)){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jne",dest);
         }else{
             fprintf(fasm,fmt2,"cmp",src1,src2);
@@ -802,17 +702,13 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_ble:
-        if(!is_reg(src1)&&!is_reg(src2)&&(p->src1[0]!='$'&&p->src1[0]!='#')&&(p->src2[0]!='$'&&p->src2[0]!='#')){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            fprintf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jle",dest);
-            break;
-        }
-        if(is_int(p->src1)&&is_int(p->src2)){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            printf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        }else if(var_is_int(src1)&&var_is_int(src2)){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jle",dest);
         }else{
             fprintf(fasm,fmt2,"cmp",src1,src2);
@@ -820,35 +716,27 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_bls:
-        if(!is_reg(src1)&&!is_reg(src2)&&(p->src1[0]!='$'&&p->src1[0]!='#')&&(p->src2[0]!='$'&&p->src2[0]!='#')){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            fprintf(fasm,fmt2,"cmp",tmp_reg[0],src2);
-            fprintf(fasm,fmt1,"jle",dest);
-            break;
-        }
-        if(is_int(p->src1)&&is_int(p->src2)){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            printf(fasm,fmt2,"cmp",tmp_reg[0],src2);
-            fprintf(fasm,fmt1,"jle",dest);
+        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
+            fprintf(fasm,fmt1,"jl",dest);
+        }else if(var_is_int(src1)&&var_is_int(src2)){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
+            fprintf(fasm,fmt1,"jl",dest);
         }else{
             fprintf(fasm,fmt2,"cmp",src1,src2);
-            fprintf(fasm,fmt1,"jle",dest);
+            fprintf(fasm,fmt1,"jl",dest);
         }
         break;
     case op_bgt:
-        if(!is_reg(src1)&&!is_reg(src2)&&(p->src1[0]!='$'&&p->src1[0]!='#')&&(p->src2[0]!='$'&&p->src2[0]!='#')){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            fprintf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jg",dest);
-            break;
-        }
-        if(is_int(p->src1)&&is_int(p->src2)){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            printf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        }else if(var_is_int(src1)&&var_is_int(src2)){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jg",dest);
         }else{
             fprintf(fasm,fmt2,"cmp",src1,src2);
@@ -856,17 +744,13 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_bge:
-        if(!is_reg(src1)&&!is_reg(src2)&&(p->src1[0]!='$'&&p->src1[0]!='#')&&(p->src2[0]!='$'&&p->src2[0]!='#')){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            fprintf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jge",dest);
-            break;
-        }
-        if(is_int(p->src1)&&is_int(p->src2)){
-            apply_reg(tmp_reg[0],src1,dest,src2,0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],src1);
-            printf(fasm,fmt2,"cmp",tmp_reg[0],src2);
+        }else if(var_is_int(src1)&&var_is_int(src2)){
+            fprintf(fasm,fmt2,"mov","eax",src1);
+            fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jge",dest);
         }else{
             fprintf(fasm,fmt2,"cmp",src1,src2);
@@ -877,128 +761,78 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         fprintf(fasm,fmt1,"jmp",dest);
         break;
     case op_prints:
-        fprintf(fasm,fmt1,"push","eax");
-        fprintf(fasm,fmt1,"push","ecx");
-        fprintf(fasm,fmt1,"push","edx");
         if(dest[0]=='@'){
             fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_printf","OFFSET","_fmt_out_s","OFFSET",dest);
         }else{
             fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_printf","OFFSET","_fmt_out_s","OFFSET",dest);
         }
-        fprintf(fasm,fmt1,"pop","edx");
-        fprintf(fasm,fmt1,"pop","ecx");
-        fprintf(fasm,fmt1,"pop","eax");
         break;
     case op_printi:
-        if(p->dest[0]=='^'){
-            apply_reg(tmp_reg[0],"","","",0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],dest);
-            fprintf(fasm,fmt1,"push","eax");
-            fprintf(fasm,fmt1,"push","ecx");
-            fprintf(fasm,fmt1,"push","edx");
-            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i",tmp_reg[0]);
-            fprintf(fasm,fmt1,"pop","edx");
-            fprintf(fasm,fmt1,"pop","ecx");
-            fprintf(fasm,fmt1,"pop","eax");
+        if(var_is_para(dest)){
+            fprintf(fasm,fmt2,"mov","eax",dest);
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i","eax");
         }else{
-            fprintf(fasm,fmt1,"push","eax");
-            fprintf(fasm,fmt1,"push","ecx");
-            fprintf(fasm,fmt1,"push","edx");
             fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_i",dest);
-            fprintf(fasm,fmt1,"pop","edx");
-            fprintf(fasm,fmt1,"pop","ecx");
-            fprintf(fasm,fmt1,"pop","eax");
         }
         break;
     case op_printc:
-        if(p->dest[0]=='^'){
-            apply_reg(tmp_reg[0],"","","",0);
-            fprintf(fasm,fmt2,"mov",tmp_reg[0],dest);
-            fprintf(fasm,fmt1,"push","eax");
-            fprintf(fasm,fmt1,"push","ecx");
-            fprintf(fasm,fmt1,"push","edx");
-            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c",tmp_reg[0]);
-            fprintf(fasm,fmt1,"pop","edx");
-            fprintf(fasm,fmt1,"pop","ecx");
-            fprintf(fasm,fmt1,"pop","eax");
+        if(var_is_para(dest)){
+            fprintf(fasm,fmt2,"mov","eax",dest);
+            fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c","eax");
         }else{
-            fprintf(fasm,fmt1,"push","eax");
-            fprintf(fasm,fmt1,"push","ecx");
-            fprintf(fasm,fmt1,"push","edx");
             fprintf(fasm,"\t%s\t%s,%s %s,%s\n","invoke","crt_printf","OFFSET","_fmt_out_c",dest);
-            fprintf(fasm,fmt1,"pop","edx");
-            fprintf(fasm,fmt1,"pop","ecx");
-            fprintf(fasm,fmt1,"pop","eax");
         }
         break;
     case op_scanfc:
-        if(dest[0]=='@'){
-            if(is_reg(dest)&&!is_global_reg(dest)){
-                sendback_reg(dest);
-            }
-            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_c","ADDR",p->dest);
+        if(var_is_reg(dest)){//获取寄存器对应的变量名称
+            reconvert_name(ce_name,p->dest);
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_c","ADDR",ce_name);
+            fprintf(fasm,fmt2,"mov",dest,ce_name);
+        }else if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_c","ADDR",dest);
+        }else if(dest[0]=='_'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_c","OFFSET",dest);
         }else{
-            if(is_reg(dest)&&!is_global_reg(dest)){
-                sendback_reg(dest);
-            }
-            if(is_global_reg(dest)){
-                fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_c","OFFSET",p->dest);
-                fprintf(fasm,fmt2,"mov",dest,p->dest);
-            }else{
-                fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_c","OFFSET",dest);
-            }
+            printf("未考虑");
         }
         break;
     case op_scanfi:
-        if(dest[0]=='@'){
-            if(is_reg(dest)&&!is_global_reg(dest)){
-                sendback_reg(dest);
-            }
-            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_i","ADDR",p->dest);
+        if(var_is_reg(dest)){//获取寄存器对应的变量名称
+            reconvert_name(ce_name,p->dest);
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_i","ADDR",ce_name);
+            fprintf(fasm,fmt2,"mov",dest,ce_name);
+        }else if(dest[0]=='@'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_i","ADDR",dest);
+        }else if(dest[0]=='_'){
+            fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_i","OFFSET",dest);
         }else{
-            if(is_reg(dest)&&!is_global_reg(dest)){
-                sendback_reg(dest);
-            }
-            if(is_global_reg(dest)){
-                fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_i","OFFSET",p->dest);
-                fprintf(fasm,fmt2,"mov",dest,p->dest);
-            }else{
-                fprintf(fasm,"\t%s\t%s,%s %s,%s %s\n","invoke","crt_scanf","OFFSET","_fmt_in_i","OFFSET",dest);
-            }
+            printf("未考虑");
         }
         break;
     case op_set_label:
-        if(strcmp(dest,"_label064")==0){
-            printf("h970");
-        }
         fprintf(fasm,"%s:\n",dest);
         break;
     case op_load_ret:
         fprintf(fasm,fmt2,"mov",dest,"eax");
         break;
     case op_arr_get:
-        apply_reg(tmp_reg[1],src1,dest,src2,0);
-        fprintf(fasm,"\t%s\t%s,[%s]\n","lea",tmp_reg[1],src1);
-        if(!is_reg(src2)){
-            if(p->src2[0]=='$'||p->src2[0]=='#'){
-                apply_reg(tmp_reg[2],src2,dest,tmp_reg[1],0);
+        fprintf(fasm,"\t%s\t%s,[%s]\n","lea","eax",src1);
+        if(var_is_reg(src2)){
+            if(var_is_reg(dest)){
+                fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov",dest,"eax",src2);
             }else{
-                apply_reg(tmp_reg[2],src2,dest,tmp_reg[1],1);
+                fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov","eax","eax",src2);
+                fprintf(fasm,fmt2,dest,"eax");
             }
-            fprintf(fasm,fmt2,"mov",tmp_reg[2],src2);
         }else{
-            strcpy(tmp_reg[2],src2);
+            fprintf(fasm,fmt2,"mov","ecx",src2);
+            if(var_is_reg(dest)){
+                fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov",dest,"eax","ecx");
+            }else{
+                fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov","eax","eax","ecx");
+                fprintf(fasm,fmt2,"mov",dest,"eax");
+            }
         }
-        if(!is_reg(dest)){
-            apply_reg(tmp_reg[0],dest,tmp_reg[1],tmp_reg[2],0);
-            fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov",tmp_reg[0],tmp_reg[1],tmp_reg[2]);
-            fprintf(fasm,fmt2,"mov",dest,tmp_reg[0]);
-        }else{
-            fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov",dest,tmp_reg[1],tmp_reg[2]);
-        }
-//        fprintf(fasm,fmt2,"imul","eax","4");
-//        fprintf(fasm,fmt2,"add","eax","ebx");
-//        fprintf(fasm,"\t%s\t%s,dword ptr [%s]","mov",dest,"eax");
         break;
     default:
         fprintf(fasm,"不合法指令\n");
@@ -1055,9 +889,6 @@ void opt_gen_asm_code(){
                     break;
                 case op_para:
                 case op_call:
-                    sendback_reg("eax");
-                    sendback_reg("ecx");
-                    sendback_reg("edx");
                     para_count=0;
                     while(p->op==op_para){//参数压栈
                         reconvert_name(ce_name,p->dest);//TODO ，参数可能是寄存器值
