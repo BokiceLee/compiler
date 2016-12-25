@@ -544,7 +544,7 @@ void opt_reconvert_name(int funcx,struct opt_quat_struct* p,char dest[],char src
 
 }
 
-void opt_gen_instruction(int funcx,struct opt_quat_struct* p){
+void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is_main){
     char dest[VAR_LEN];
     char src1[VAR_LEN];
     char src2[VAR_LEN];
@@ -558,7 +558,7 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p){
         if(strcmp(dest,src1)==0){
             if(is_reg(src1)){
                 fprintf(fasm,fmt2,"add",dest,src2);
-            }else if(n_var(src2)){
+            }else if(n_var(src2)){//不是内存值
                 fprintf(fasm,fmt2,"add",dest,src2);
             }else{
                 apply_reg(tmp_reg,src2,dest,src1);//位置0为替换结果，位置1为替换目标，申请一个未在其他位置出现的临时寄存器
@@ -870,15 +870,82 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p){
     }
 }
 void opt_gen_asm_code(){
+    int para_count=0;
+    char ce_name[VAR_LEN];
+    int var_flag=0;
+    int is_main;
+    fprintf(fasm,"%s",".code\n");
+
     int i,j;
     struct opt_quat_struct* p;
     for(i=0;i<g_funct_num;i++){
-        opt_gen_asm_local_data(i);
         for(j=0;j<functs[i].block_num;j++){
             p=functs[i].blocks[j].block_begin;
-
-            if(j==0){
-                //跳过变量声明
+            if(j==0&&(p->op==op_func||p->op==op_main)){
+                if(p->op==op_main){
+                    fprintf(fasm,"main PROC\n");
+                    p=p->next;
+                    is_main=1;
+                }else{
+                    reconvert_name(ce_name,p->dest);
+                    fprintf(fasm,"%s PROC\n",ce_name);
+                    p=p->next;
+                    is_main=0;
+                }
+                if(opt_gen_asm_local_data(i)>0){
+                    var_flag=1;
+                }else{
+                    fprintf(fasm,"\t%s\t%s\n","push","ebp");
+                    fprintf(fasm,"\t%s\t%s,%s\n","mov","ebp","esp");
+                    var_flag=0;
+                }
+                fprintf(fasm,"\t%s\t%s\n","push","ebx");
+                fprintf(fasm,"\t%s\t%s\n","push","edi");
+                fprintf(fasm,"\t%s\t%s\n","push","esi");//被调用者保护现场
+                p=p->next;
+                while(p!=NULL&&(p->op==op_var_dcl||p->op==op_array_dcl)){
+                    p=p->next;
+                }
+            }
+            while(p!=NULL){
+                switch(p->op){
+                case op_emain:
+                    fprintf(fasm,"main ENDP\n");
+                    fprintf(fasm,"END main\n");
+                    p=p->next;
+                    break;
+                case op_efunc:
+                    reconvert_name(ce_name,p->dest);
+                    fprintf(fasm,"%s ENDP\n",ce_name);
+                    p=p->next;
+                    break;
+                case op_para:
+                case op_call:
+                    sendback_reg("eax");
+                    fprintf(fasm,"\t%s\t%s\n","push","ecx");
+                    fprintf(fasm,"\t%s\t%s\n","push","edx");//调用者保护现场
+                    para_count=0;
+                    while(p->op==op_para){//参数压栈
+                        reconvert_name(ce_name,p->dest);
+                        fprintf(fasm,"\t%s\t%s\n","push",ce_name);
+                        para_count++;
+                        p=p->next;
+                    }//可能无参
+                    if(p->op==op_call){//传参后面正常来说是函数调用
+                        reconvert_name(ce_name,p->dest);
+                        fprintf(fasm,"\t%s\t%s\n","call",ce_name);
+                        if(para_count){//弹参数
+                            fprintf(fasm,"\t%s\t%s,%d\n","add","esp",4*para_count);
+                        }
+                        p=p->next;
+                    }
+                    fprintf(fasm,"\t%s\t%s\n","pop","edx");
+                    fprintf(fasm,"\t%s\t%s\n","pop","ecx");
+                    break;
+                default:
+                    opt_gen_instruction(i,p,var_flag,is_main);
+                    p=p->next;
+                }
             }
         }
     }
