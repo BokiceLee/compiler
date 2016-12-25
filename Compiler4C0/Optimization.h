@@ -1113,4 +1113,26 @@ void optimize()
 //    }
     return;
 }
+void opt_outputquat(){
+    int i,j;
+    int m=0;
+    int op_n;
+    struct opt_quat_struct* p;
+    fquat=fopen(fquat_name,"w");
+    for(i=0;i<g_funct_num;i++){
+        for(j=0;j<functs[i].block_num;j++){
+            p=functs[i].blocks[j].block_begin;
+            while(p!=NULL){
+                fprintf(fquat,"%d  ",m);
+                m++;
+                op_n=p->op;
+                fprintf(fquat,"%s  ",op_name[op_n]);
+                convert_output(p->dest);
+                convert_output(p->src1);
+                convert_output(p->src2);
+                fprintf(fquat,"\n");
+            }
+        }
+    }
+}
 #endif // OPTIMIZATION_H_INCLUDED

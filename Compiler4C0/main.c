@@ -22,6 +22,8 @@ int main(){
     is_optimize=1;
     if(is_optimize){
         optimize();
+        outputquat();
+        opt_gen_asm();
     }else{
         outputquat();
         gen_asm();
