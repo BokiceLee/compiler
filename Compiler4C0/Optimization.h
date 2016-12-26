@@ -1131,6 +1131,7 @@ void opt_outputquat(){
                 convert_output(p->src1);
                 convert_output(p->src2);
                 fprintf(fquat,"\n");
+                p=p->next;
             }
         }
     }

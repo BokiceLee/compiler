@@ -19,10 +19,10 @@ int main(){
     printf("语法分析结束\n");
     printf("是否进行优化?1:是,0:否");
     //scanf("%d",&is_optimize);
-    is_optimize=0;
+    is_optimize=1;
     if(is_optimize){
         optimize();
-        outputquat();
+        opt_outputquat();
         opt_gen_asm();
     }else{
         outputquat();

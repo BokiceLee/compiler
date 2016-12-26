@@ -438,7 +438,11 @@ int var_is_int(char vvv[]){
     if(vvv[0]=='\0'){
         return 0;
     }
-    for(i=0;vvv[i]!='\0';i++){
+    i=0;
+    if(vvv[i]=='-'){
+        i++;
+    }
+    for(;vvv[i]!='\0';i++){
         if(isdigit(vvv[i])==0){
             return 0;
         }
@@ -663,10 +667,10 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_ret_value:
+        fprintf(fasm,fmt2,"mov","eax",dest);
         fprintf(fasm,"\t%s\t%s\n","pop","esi");
         fprintf(fasm,"\t%s\t%s\n","pop","edi");
         fprintf(fasm,"\t%s\t%s\n","pop","ebx");//被调用者恢复现场
-        fprintf(fasm,fmt2,"mov","eax",dest);
         if(var_flag==0){
             fprintf(fasm,"\t%s\t%s,%s\n","mov","esp","ebp");
             fprintf(fasm,"\t%s\t%s\n","pop","ebp");
@@ -870,7 +874,7 @@ void opt_gen_asm_code(){
                 fprintf(fasm,"\t%s\t%s\n","push","ebx");
                 fprintf(fasm,"\t%s\t%s\n","push","edi");
                 fprintf(fasm,"\t%s\t%s\n","push","esi");//被调用者保护现场
-                p=p->next;
+                //p=p->next;
                 while(p!=NULL&&(p->op==op_var_dcl||p->op==op_array_dcl)){
                     p=p->next;
                 }
@@ -907,6 +911,7 @@ void opt_gen_asm_code(){
                     break;
                 default:
                     opt_gen_instruction(i,p,var_flag,is_main);
+                    fprintf(fasm,";%s %s %s %s\n",op_name[p->op],p->dest,p->src1,p->src2);
                     p=p->next;
                 }
             }
