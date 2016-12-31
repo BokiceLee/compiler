@@ -18,8 +18,7 @@ int main(){
     program();
     printf("语法分析结束\n");
     printf("是否进行优化?1:是,0:否");
-    //scanf("%d",&is_optimize);
-    is_optimize=1;
+    scanf("%d",&is_optimize);
     if(is_optimize){
         optimize();
         opt_outputquat();

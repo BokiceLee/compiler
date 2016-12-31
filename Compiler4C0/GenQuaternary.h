@@ -77,7 +77,6 @@ void insert2name(char name[],int c,int typ);
 void convert_name(char dest[],char src[],int is_global);
 void para_name(char dest[],int n);
 void gen_string_name(char name[]);
-int gen_quaternary(int op,char dest[],char src1[],char src2[]);
 int get_para_index(int pos);
 void convert_output(char name[]);
 void outputquat();

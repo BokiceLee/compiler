@@ -21,16 +21,16 @@ void finish_compile();
 void setInputOutput(){
     set_in:
     printf("输入源代码文件的绝对路径，按回车结束\n");
-//    scanf("%s",fsourcename);
-    strcpy(fsourcename,"C://Users//24745//Desktop//quick_link//c_t//14061110_test2.txt");
+    scanf("%s",fsourcename);
+    //strcpy(fsourcename,"C://Users//24745//Desktop//error_test//e5.txt");
     fsource=fopen(fsourcename,"r");
     if(NULL==fsource){
         printf("no such file\n");
         goto set_in;
     }
     printf("输入存储的四元式结果和汇编结果的目录的绝对路径，文件的名称默认为quat.txt和res.asm\n");
-//    scanf("%s",ftarget_dir);
-    strcpy(ftarget_dir,"C://Users//24745//Desktop//hh//");
+    scanf("%s",ftarget_dir);
+//    strcpy(ftarget_dir,"C://Users//24745//Desktop//hh//");
     strcpy(fquat_name,ftarget_dir);
     strcpy(fasm_name,ftarget_dir);
     strcat(fquat_name,"/quat.txt");

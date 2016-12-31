@@ -339,16 +339,16 @@ int get_child_id(char var_name[]){//获取dag图节点id
 int get_parent_id(int op,int src1_id,int src2_id){//获取dag图节点id
     int i;
     for(i=dag_map_x;i>=0;i--){
-        if(dag_map[dag_map_x].op==op){
+        if(dag_map[i].op==op){
             if(op==op_add||op==op_mul){
-                if(dag_map[dag_map_x].lchild_id==src1_id && dag_map[dag_map_x].rchild_id==src2_id){
-                    return dag_map_x;
-                }else if(dag_map[dag_map_x].lchild_id==src2_id && dag_map[dag_map_x].rchild_id==src1_id){
-                    return dag_map_x;
+                if(dag_map[i].lchild_id==src1_id && dag_map[i].rchild_id==src2_id){
+                    return i;
+                }else if(dag_map[i].lchild_id==src2_id && dag_map[i].rchild_id==src1_id){
+                    return i;
                 }
             }else{
-                if(dag_map[dag_map_x].lchild_id==src1_id && dag_map[dag_map_x].rchild_id==src2_id){
-                    return dag_map_x;
+                if(dag_map[i].lchild_id==src1_id && dag_map[i].rchild_id==src2_id){
+                    return i;
                 }
             }
         }
@@ -361,6 +361,8 @@ int get_parent_id(int op,int src1_id,int src2_id){//获取dag图节点id
         dag_map[dag_map_x].op=op;
         dag_map[dag_map_x].is_assigned=1;
         father_num[dag_map_x]=0;
+        father_num[src1_id]++;
+        father_num[src2_id]++;
     }
     return dag_map_x;
 }
@@ -407,8 +409,8 @@ void build_dag(int con_num){//建立dag图和dag表
             src1_id=get_child_id(p->src1);
             src2_id=get_child_id(p->src2);
             dest_id=get_parent_id(p->op,src1_id,src2_id);//更新父节点个数，什么父节点
-            father_num[src1_id]++;
-            father_num[src2_id]++;
+            //father_num[src1_id]++;
+            //father_num[src2_id]++;
             update_dag_table(p,dest_id,p->dest);
         }
         p=p->next;
@@ -592,10 +594,10 @@ void export_dag(){//从dag图重新导出中间代码
     }
     while((export_id=get_max_node())>=0){
         export_queue[export_x++]=export_id;
-        if(dag_map[export_id].op==op_leaf){
-            continue;
-        }
-        while(1){
+        //if(dag_map[export_id].op==op_leaf){
+        //    continue;
+        //}
+        while(0){
             if(is_exportable(dag_map[export_id].lchild_id)){
                 export_id=dag_map[export_id].lchild_id;
                 export_queue[export_x++]=export_id;
@@ -827,6 +829,10 @@ void get_use_def(struct block_struct *p_block){//求每个基本块的use和def集
         case op_mov:
             add_ele(0,p->src1,p_block);
             add_ele(1,p->dest,p_block);
+            break;
+        case op_load_ret:
+            add_ele(1,p->dest,p_block);
+            break;
         default:
             ;
         }
@@ -1056,19 +1062,19 @@ void optimize()
         for(j=0;j<functs[i].block_num;j++){
             get_use_def(&(functs[i].blocks[j]));
             get_suffix(i,j);
-            printf("\nfunct %d block %d \nuse: ",i,j);
+            /*printf("\nfunct %d block %d \nuse: ",i,j);
             for(k=0;k<functs[i].blocks[j].use_len;k++){
                 printf("%s ",functs[i].blocks[j].use[k]);
             }
             printf("\ndef: ");
             for(k=0;k<functs[i].blocks[j].def_len;k++){
                 printf("%s ",functs[i].blocks[j].def[k]);
-            }
+            }*/
         }
     }
     for(i=0;i<funct_num;i++){
         cal_in_out(i);
-        for(j=0;j<functs[i].block_num;j++){
+        /*for(j=0;j<functs[i].block_num;j++){
             printf("\nfunct %d block %d \nin: ",i,j);
             for(k=0;k<functs[i].blocks[j].in_len;k++){
                 printf("%s ",functs[i].blocks[j].in[k]);
@@ -1077,15 +1083,15 @@ void optimize()
             for(k=0;k<functs[i].blocks[j].out_len;k++){
                 printf("%s ",functs[i].blocks[j].out[k]);
             }
-        }
+        }*/
     }
     for(i=0;i<funct_num;i++){
         build_conflit_matrix(i);
         alloct_reg(i);
-        printf("\nfunct %d",i);
+        /*printf("\nfunct %d",i);
         for(j=0;j<functs[i].var_reg_len;j++){
             printf("\n%s,%d",functs[i].var_reg[j].var,functs[i].var_reg[j].reg);
-        }
+        }*/
     }
 //    quat_num=0;
 //    for(p=data;p!=NULL;p=p->next){

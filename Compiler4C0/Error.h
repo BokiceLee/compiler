@@ -1,7 +1,7 @@
 #include "LexicalAnalysis.h"
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
-#define ERROR_NUM 54
+#define ERROR_NUM 55
 #define SET_LEN 30
 char errormsg[ERROR_NUM][60]={
         "数字以0开头"						  ,//0
@@ -37,12 +37,12 @@ char errormsg[ERROR_NUM][60]={
         "读写语句的’,’后应为标识符"           ,//30
         "不可识别语句"                        ,//31
         "未定义标识符"                        ,//32
-        "数组引用越界"                        ,//33
+        ""                        ,//33
         "不规范的标示符类型"                  ,//34
         "函数调用的参数个数或类型不匹配"      ,//35
         "重复定义标识符"                      ,//36
         "无返回值函数不能作为因子"            ,//37
-        "有返回值函数没有合法的返回语句"      ,//38
+        ""      ,//38
         "+-符号后应为数字"                    ,//39
         "case后应为常量"                      ,//40
         "case后应为:"                         ,//41
@@ -57,7 +57,8 @@ char errormsg[ERROR_NUM][60]={
         "switch语句中的标签重复"              ,//50
         "程序不完整，可能未正确定义main函数，自动结束编译"   ,//51
         "标识符与保留字冲突或者保留字大小写出错"   ,//52
-        "为函数或常量赋值"                     //53
+        "为函数或常量赋值"                     ,//53
+        "非法因子"                              //54
 };
 
 int errors=0;

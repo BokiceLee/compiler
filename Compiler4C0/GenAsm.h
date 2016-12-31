@@ -628,9 +628,9 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         break;
     case op_mov:
         if(
-           ( var_is_mem(dest) || var_is_para(dest) )
+           ( var_is_mem(dest) || var_is_para(dest) || var_is_int(dest))
            &&
-           ( var_is_mem(src1) || var_is_para(src1) ) ){
+           ( var_is_mem(src1) || var_is_para(src1) || var_is_int(src1)) ){
            fprintf(fasm,fmt2,"mov","eax",src1);
            fprintf(fasm,fmt2,"mov",dest,"eax");
         }else{
@@ -678,11 +678,7 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         fprintf(fasm,fmt0,"ret");
         break;
     case op_beq:
-        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
-            fprintf(fasm,fmt2,"mov","eax",src1);
-            fprintf(fasm,fmt2,"cmp","eax",src2);
-            fprintf(fasm,fmt1,"je",dest);
-        }else if(var_is_int(src1)&&var_is_int(src2)){
+        if((var_is_mem(src1)||var_is_para(src1)||var_is_int(src1))&&(var_is_mem(src2)||var_is_para(src2)||var_is_int(src2))){
             fprintf(fasm,fmt2,"mov","eax",src1);
             fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"je",dest);
@@ -692,11 +688,7 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_bne:
-        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
-            fprintf(fasm,fmt2,"mov","eax",src1);
-            fprintf(fasm,fmt2,"cmp","eax",src2);
-            fprintf(fasm,fmt1,"jne",dest);
-        }else if(var_is_int(src1)&&var_is_int(src2)){
+        if((var_is_mem(src1)||var_is_para(src1)||var_is_int(src1))&&(var_is_mem(src2)||var_is_para(src2)||var_is_int(src2))){
             fprintf(fasm,fmt2,"mov","eax",src1);
             fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jne",dest);
@@ -706,11 +698,7 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_ble:
-        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
-            fprintf(fasm,fmt2,"mov","eax",src1);
-            fprintf(fasm,fmt2,"cmp","eax",src2);
-            fprintf(fasm,fmt1,"jle",dest);
-        }else if(var_is_int(src1)&&var_is_int(src2)){
+        if((var_is_mem(src1)||var_is_para(src1)||var_is_int(src1))&&(var_is_mem(src2)||var_is_para(src2)||var_is_int(src2))){
             fprintf(fasm,fmt2,"mov","eax",src1);
             fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jle",dest);
@@ -720,11 +708,7 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_bls:
-        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
-            fprintf(fasm,fmt2,"mov","eax",src1);
-            fprintf(fasm,fmt2,"cmp","eax",src2);
-            fprintf(fasm,fmt1,"jl",dest);
-        }else if(var_is_int(src1)&&var_is_int(src2)){
+        if((var_is_mem(src1)||var_is_para(src1)||var_is_int(src1))&&(var_is_mem(src2)||var_is_para(src2)||var_is_int(src2))){
             fprintf(fasm,fmt2,"mov","eax",src1);
             fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jl",dest);
@@ -734,11 +718,7 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_bgt:
-        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
-            fprintf(fasm,fmt2,"mov","eax",src1);
-            fprintf(fasm,fmt2,"cmp","eax",src2);
-            fprintf(fasm,fmt1,"jg",dest);
-        }else if(var_is_int(src1)&&var_is_int(src2)){
+        if((var_is_mem(src1)||var_is_para(src1)||var_is_int(src1))&&(var_is_mem(src2)||var_is_para(src2)||var_is_int(src2))){
             fprintf(fasm,fmt2,"mov","eax",src1);
             fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jg",dest);
@@ -748,11 +728,7 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
         }
         break;
     case op_bge:
-        if((var_is_mem(src1)||var_is_para(src1))&&(var_is_mem(src2)||var_is_para(src2))){
-            fprintf(fasm,fmt2,"mov","eax",src1);
-            fprintf(fasm,fmt2,"cmp","eax",src2);
-            fprintf(fasm,fmt1,"jge",dest);
-        }else if(var_is_int(src1)&&var_is_int(src2)){
+        if((var_is_mem(src1)||var_is_para(src1)||var_is_int(src1))&&(var_is_mem(src2)||var_is_para(src2)||var_is_int(src2))){
             fprintf(fasm,fmt2,"mov","eax",src1);
             fprintf(fasm,fmt2,"cmp","eax",src2);
             fprintf(fasm,fmt1,"jge",dest);
@@ -826,7 +802,7 @@ void opt_gen_instruction(int funcx,struct opt_quat_struct* p,int var_flag,int is
                 fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov",dest,"eax",src2);
             }else{
                 fprintf(fasm,"\t%s\t%s,[%s+4*%s]\n","mov","eax","eax",src2);
-                fprintf(fasm,fmt2,dest,"eax");
+                fprintf(fasm,fmt2,"mov",dest,"eax");
             }
         }else{
             fprintf(fasm,fmt2,"mov","ecx",src2);
@@ -911,7 +887,7 @@ void opt_gen_asm_code(){
                     break;
                 default:
                     opt_gen_instruction(i,p,var_flag,is_main);
-                    fprintf(fasm,";%s %s %s %s\n",op_name[p->op],p->dest,p->src1,p->src2);
+                    //fprintf(fasm,";%s %s %s %s\n",op_name[p->op],p->dest,p->src1,p->src2);
                     p=p->next;
                 }
             }

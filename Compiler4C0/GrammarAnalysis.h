@@ -61,7 +61,9 @@ void program(){
             test(stop_set,stop_set_len,NULL,0,31);
         }
     }
-    funct_main_declaraction(NULL,0);
+    if(check_redeclaraction(1,"main")==0){
+        funct_main_declaraction(NULL,0);
+    }
     //printf("程序\n");
     if(sym==-1 && errors==0){
         printf("程序正确结束\n");
@@ -601,7 +603,7 @@ int factor(int fsys[],int fsys_len,int* const ftype,char fname[]){
     char basename[VAR_LEN];
     int para_n=0;
     //test
-    test(legal_set,legal_set_len,fsys,fsys_len,31);
+    test(legal_set,legal_set_len,fsys,fsys_len,54);
     if(sym==ident||sym==intcon||sym==charcon||sym==pluss||sym==minuss){
         if(sym==ident){
             strcpy(tmp_token,token);
@@ -684,15 +686,15 @@ int term(int fsys[],int fsys_len,int* const ttype,char tname[]){
     factor(stop_set,stop_set_len,p_ftype1,fname1);
     *ttype=ftype1;
     while(times==sym||idiv==sym){
-        if(*ttype==chars){
-            error(11);
-        }
+        //if(*ttype==chars){
+        //    error(11);
+        //}
         fac_op=sym;
         getNextSym();
         factor(stop_set,stop_set_len,p_ftype2,fname2);
-        if(ftype2==chars){
-            error(11);
-        }
+        //if(ftype2==chars){
+        //    error(11);
+        //}
         gen_name(tname);
         if(fac_op==times){
             gen_quaternary(op_mul,tname,fname1,fname2);
@@ -722,9 +724,9 @@ int simpleexpression(int fsys[],int fsys_len,int* const stype,char sname[]){
         term(stop_set,stop_set_len,p_ttype1,tname1);
         if(positive==minuss){
             //插入取反操作
-            if(ttype1==chars){
-                error(11);
-            }
+            //if(ttype1==chars){
+            //    error(11);
+            //}
             gen_name(tname2);
             gen_quaternary(op_sub,tname2,"$0",tname1);
         }else{
@@ -740,9 +742,9 @@ int simpleexpression(int fsys[],int fsys_len,int* const stype,char sname[]){
         positive=sym;
         getNextSym();
         term(stop_set,stop_set_len,p_ttype1,tname1);
-        if(*stype!=ttype1){
-            error(11);
-        }
+        //if(*stype!=ttype1){
+        //    error(11);
+        //}
         if(positive==pluss){
             //插入加指令
             gen_quaternary(op_add,sname,tname2,tname1);
@@ -779,9 +781,9 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
         getNextSym();
         stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
         selector(stop_set,stop_set_len,p_seltype,selname);
-        if(seltype==chars){
-            error(11);
-        }
+        //if(seltype==chars){
+        //    error(11);
+        //}
         convert_name(basename,tmp_token,is_global);
     }
     if(sym!=becomes){
@@ -808,11 +810,11 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
             }else{
                 target_type=local_ident_tab[res_position].typ;
             }
-            if(stype==ints&&target_type==chars){
-                error(11);
-            }else if(stype==chars&&target_type==ints){
-                error(11);
-            }
+            //if(stype==ints&&target_type==chars){
+                //error(11);
+            //}else if(stype==chars&&target_type==ints){
+                //error(11);
+            //}
             if(is_arr==0){
                 if(is_global==0&&local_ident_tab[res_position].obj==paras){
                     para_name(target_name,local_ident_tab[res_position].adr);
@@ -823,13 +825,6 @@ void assignment(int fsys[],int fsys_len,char tmp_token[]){
             }else{
                 gen_quaternary(op_arr_assign,basename,selname,sname);
             }
-            //插入运算指令
-    //        if(ret_typ==ints && ident_tab[res_position].typ==ints){
-    //        }else if(ret_typ==chars && ident_tab[res_position].typ==chars){
-    //        }else if(ret_typ==ints && ident_tab[res_position].typ==ints){
-    //        }else{
-    //            error(11);//报错之后继续插入
-    //        }
         }
     }
     //printf("赋值语句\n");
@@ -1212,7 +1207,9 @@ void return_statement(int fsys[],int fsys_len){
     stop_set_len=merge_sym_set(stop_set,stop_set_len,fsys,fsys_len);
     simpleexpression(stop_set,stop_set_len,p_stype,sname);
     if(global_ident_tab[global_ident_index-1].typ!=stype){
-        error(46);
+        if(global_ident_tab[global_ident_index-1].typ==notyp||stype==notyp){
+            error(46);
+        }
     }
     needsym(rparent);
     gen_quaternary(op_ret_value,sname,"","");
